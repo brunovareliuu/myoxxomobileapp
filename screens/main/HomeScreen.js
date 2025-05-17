@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, SafeAreaView, StyleSheet } from 'react-native';
+import { View, Text, SafeAreaView, StyleSheet, TouchableOpacity } from 'react-native';
 import { globalStyles, colors } from '../../styles/globalStyles';
 
-export default function HomeScreen({ route }) {
+export default function HomeScreen({ route, navigation }) {
   // Recibe el nombre de la tienda por params
   const tiendaNombre = route?.params?.tiendaNombre || 'Tienda';
   const tiendaCiudad = 'Ciudad de Ejemplo'; // Puedes cambiar esto si tienes la ciudad
@@ -14,6 +14,15 @@ export default function HomeScreen({ route }) {
           <Text style={styles.welcomeText}>Bienvenido a</Text>
           <Text style={styles.storeName}> {tiendaNombre}</Text>
           <Text style={styles.locationText}>{tiendaCiudad}</Text>
+        </View>
+
+        <View style={styles.buttonsContainer}>
+          <TouchableOpacity
+            style={globalStyles.secondaryButton}
+            onPress={() => navigation.navigate('ProductCapture')}
+          >
+            <Text style={globalStyles.secondaryButtonText}>Capturar Productos</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>
@@ -47,4 +56,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.9,
   },
-}); 
+  buttonsContainer: {
+    width: '100%',
+    paddingHorizontal: 20,
+    marginTop: 30,
+  },
+});
