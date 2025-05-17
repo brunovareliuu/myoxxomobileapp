@@ -12,7 +12,7 @@ export default function Login({ navigation }) {
       return;
     }
     // Simplemente navegar al Home
-    navigation.replace('Home');
+    navigation.replace('MainApp');
   };
 
   return (

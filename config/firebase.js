@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirestore } from 'firebase/firestore';
 
@@ -22,24 +22,10 @@ if (getApps().length === 0) {
   app = getApp();
 }
 
-// Inicializar Auth con persistencia solo si no existe (React Native)
-let auth;
-try {
-  auth = getAuth(app);
-  // Si no hay usuarios, puede lanzar error, por eso el try/catch
-} catch (e) {
-  auth = undefined;
-}
-if (!auth || !auth.currentUser) {
-  try {
-    auth = initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage)
-    });
-  } catch (e) {
-    // Si ya está inicializado, solo obtenlo
-    auth = getAuth(app);
-  }
-}
+// Inicializar Auth SIEMPRE con persistencia en React Native
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage)
+});
 
 // Inicializar Firestore
 const db = getFirestore(app);

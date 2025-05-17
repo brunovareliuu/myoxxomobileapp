@@ -1,34 +1,37 @@
 import React from 'react';
-import { Text, View, Image, TouchableOpacity, SafeAreaView, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, SafeAreaView } from 'react-native';
 import { globalStyles, colors } from '../../styles/globalStyles';
 
 export default function Welcome({ navigation }) {
   return (
-    <SafeAreaView style={globalStyles.container}>
-      <View style={globalStyles.content}>
+    <SafeAreaView style={[globalStyles.container, styles.container]}>
+      <View style={styles.content}>
         <View style={styles.logoContainer}>
           <Image
             source={require('../../assets/logo.png')}
-            style={styles.logo}
+            style={globalStyles.largeLogo}
             resizeMode="contain"
           />
-          <Text style={globalStyles.title}>Empieza tu Optimización</Text>
-          <Text style={globalStyles.subtitle}>Entra a una tienda o inicia sesión</Text>
         </View>
-        
+
+        <View style={styles.welcomeTextContainer}>
+          <Text style={styles.title}>¡Bienvenido!</Text>
+          <Text style={styles.subtitle}>Captura y gestiona tu inventario de manera eficiente</Text>
+        </View>
+
         <View style={styles.buttonsContainer}>
-          <TouchableOpacity 
-            style={globalStyles.primaryButton}
+          <TouchableOpacity
+            style={[globalStyles.secondaryButton, styles.button]}
             onPress={() => navigation.navigate('Login')}
           >
-            <Text style={globalStyles.primaryButtonText}>Login</Text>
+            <Text style={globalStyles.secondaryButtonText}>Iniciar Sesión</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={globalStyles.secondaryButton}
+          <TouchableOpacity
+            style={[globalStyles.primaryButton, styles.button]}
             onPress={() => navigation.navigate('Signup')}
           >
-            <Text style={globalStyles.secondaryButtonText}>Sign Up</Text>
+            <Text style={globalStyles.primaryButtonText}>Crear Cuenta</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -37,20 +40,38 @@ export default function Welcome({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  logoContainer: {
+  container: {
+    backgroundColor: colors.primary,
+  },
+  content: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
+    padding: 20,
   },
-  logo: {
-    width: 325,
-    height: 325,
-    marginBottom: 20,
-    transform: 'rotate(-10deg)',
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  welcomeTextContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: colors.white,
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 18,
+    color: colors.white,
+    textAlign: 'center',
+    opacity: 0.8,
   },
   buttonsContainer: {
-    width: '100%',
-    paddingHorizontal: 20,
-    marginBottom: 30,
+    gap: 15,
+  },
+  button: {
+    marginVertical: 5,
   },
 }); 
