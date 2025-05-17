@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { initializeApp } from "firebase/app";
 import { getFirestore } from 'firebase/firestore';
+import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Importar las pantallas
 import Welcome from './screens/auth/Welcome';
@@ -23,24 +25,55 @@ const firebaseConfig = {
 
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);
+
+// Inicializar Auth con persistencia
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage)
+});
+
 // Inicializar Firestore
 const db = getFirestore(app);
 
 const Stack = createNativeStackNavigator();
 
 export default function App() {
+  const [initializing, setInitializing] = useState(true);
+  const [user, setUser] = useState(null);
+
+  // Manejar cambios en el estado de autenticación
+  function onAuthStateChanged(user) {
+    setUser(user);
+    if (initializing) setInitializing(false);
+  }
+
+  useEffect(() => {
+    const subscriber = auth.onAuthStateChanged(onAuthStateChanged);
+    return subscriber; // unsubscribe on unmount
+  }, []);
+
+  if (initializing) {
+    return null; // O un componente de carga si lo prefieres
+  }
+
   return (
     <NavigationContainer>
       <Stack.Navigator 
-        initialRouteName="Welcome"
+        initialRouteName={user ? "Home" : "Welcome"}
         screenOptions={{
           headerShown: false,
         }}
       >
-        <Stack.Screen name="Welcome" component={Welcome} />
-        <Stack.Screen name="Login" component={Login} />
-        <Stack.Screen name="Signup" component={Signup} />
-        <Stack.Screen name="Home" component={HomeScreen} />
+        {user ? (
+          // Rutas autenticadas
+          <Stack.Screen name="Home" component={HomeScreen} />
+        ) : (
+          // Rutas no autenticadas
+          <>
+            <Stack.Screen name="Welcome" component={Welcome} />
+            <Stack.Screen name="Login" component={Login} />
+            <Stack.Screen name="Signup" component={Signup} />
+          </>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );
