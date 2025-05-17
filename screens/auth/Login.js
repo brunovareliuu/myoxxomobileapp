@@ -11,7 +11,7 @@ export default function Login({ navigation }) {
     try {
       const auth = getAuth();
       await signInWithEmailAndPassword(auth, email, password);
-      // Aquí puedes navegar a la pantalla principal después del login exitoso
+      navigation.replace('Home');
     } catch (error) {
       Alert.alert('Error', 'Error al iniciar sesión: ' + error.message);
     }
@@ -20,10 +20,10 @@ export default function Login({ navigation }) {
   return (
     <SafeAreaView style={globalStyles.container}>
       <View style={globalStyles.content}>
-        <View style={styles.logoContainer}>
+        <View style={globalStyles.compactLogoContainer}>
           <Image
             source={require('../../assets/logo.png')}
-            style={styles.logo}
+            style={globalStyles.compactLogo}
             resizeMode="contain"
           />
         </View>
@@ -33,7 +33,7 @@ export default function Login({ navigation }) {
         <TextInput
           style={globalStyles.input}
           placeholder="Correo electrónico"
-          placeholderTextColor="#666"
+          placeholderTextColor="#fff"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -43,17 +43,17 @@ export default function Login({ navigation }) {
         <TextInput
           style={globalStyles.input}
           placeholder="Contraseña"
-          placeholderTextColor="#666"
+          placeholderTextColor="#fff"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
         />
 
         <TouchableOpacity 
-          style={globalStyles.primaryButton}
+          style={globalStyles.secondaryButton}
           onPress={handleLogin}
         >
-          <Text style={globalStyles.primaryButtonText}>Iniciar Sesión</Text>
+          <Text style={globalStyles.secondaryButtonText}>Iniciar Sesión</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -72,8 +72,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   logo: {
-    width: 200,
-    height: 200,
+    width: 400,
+    height: 400,
     transform: [{rotate: '-10deg'}],
   },
 }); 

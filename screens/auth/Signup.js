@@ -52,10 +52,10 @@ export default function Signup({ navigation }) {
   return (
     <SafeAreaView style={globalStyles.container}>
       <View style={globalStyles.content}>
-        <View style={styles.logoContainer}>
+        <View style={globalStyles.compactLogoContainer}>
           <Image
             source={require('../../assets/logo.png')}
-            style={styles.logo}
+            style={globalStyles.compactLogo}
             resizeMode="contain"
           />
         </View>
@@ -65,7 +65,7 @@ export default function Signup({ navigation }) {
         <TextInput
           style={globalStyles.input}
           placeholder="Nombre Completo"
-          placeholderTextColor="#666"
+          placeholderTextColor="#fff"
           value={nombre}
           onChangeText={setNombre}
           autoCapitalize="words"
@@ -74,7 +74,7 @@ export default function Signup({ navigation }) {
         <TextInput
           style={globalStyles.input}
           placeholder="Correo electrónico"
-          placeholderTextColor="#666"
+          placeholderTextColor="#fff"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -84,7 +84,7 @@ export default function Signup({ navigation }) {
         <TextInput
           style={globalStyles.input}
           placeholder="Código de Tienda"
-          placeholderTextColor="#666"
+          placeholderTextColor="#fff"
           value={codigoTienda}
           onChangeText={setCodigoTienda}
           autoCapitalize="none"
@@ -93,7 +93,7 @@ export default function Signup({ navigation }) {
         <TextInput
           style={globalStyles.input}
           placeholder="Contraseña"
-          placeholderTextColor="#666"
+          placeholderTextColor="#fff"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -102,7 +102,7 @@ export default function Signup({ navigation }) {
         <TextInput
           style={globalStyles.input}
           placeholder="Confirmar Contraseña"
-          placeholderTextColor="#666"
+          placeholderTextColor="#fff"
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry
