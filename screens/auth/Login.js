@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Text, View, TextInput, TouchableOpacity, Alert, SafeAreaView, Image, StyleSheet } from 'react-native';
+import { Text, View, TextInput, TouchableOpacity, Alert, SafeAreaView, Image, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { globalStyles } from '../../styles/globalStyles';
 
@@ -19,49 +19,59 @@ export default function Login({ navigation }) {
 
   return (
     <SafeAreaView style={globalStyles.container}>
-      <View style={globalStyles.content}>
-        <View style={globalStyles.compactLogoContainer}>
-          <Image
-            source={require('../../assets/logo.png')}
-            style={globalStyles.compactLogo}
-            resizeMode="contain"
-          />
-        </View>
-
-        <Text style={globalStyles.title}>Iniciar Sesión</Text>
-        
-        <TextInput
-          style={globalStyles.input}
-          placeholder="Correo electrónico"
-          placeholderTextColor="#fff"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-
-        <TextInput
-          style={globalStyles.input}
-          placeholder="Contraseña"
-          placeholderTextColor="#fff"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-
-        <TouchableOpacity 
-          style={globalStyles.secondaryButton}
-          onPress={handleLogin}
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <ScrollView 
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
         >
-          <Text style={globalStyles.secondaryButtonText}>Iniciar Sesión</Text>
-        </TouchableOpacity>
+          <View style={globalStyles.content}>
+            <View style={globalStyles.compactLogoContainer}>
+              <Image
+                source={require('../../assets/logo.png')}
+                style={globalStyles.compactLogo}
+                resizeMode="contain"
+              />
+            </View>
 
-        <TouchableOpacity 
-          onPress={() => navigation.navigate('Signup')}
-        >
-          <Text style={globalStyles.linkText}>¿No tienes cuenta? Regístrate</Text>
-        </TouchableOpacity>
-      </View>
+            <Text style={globalStyles.title}>Iniciar Sesión</Text>
+            
+            <TextInput
+              style={globalStyles.input}
+              placeholder="Correo electrónico"
+              placeholderTextColor="#fff"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            <TextInput
+              style={globalStyles.input}
+              placeholder="Contraseña"
+              placeholderTextColor="#fff"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+
+            <TouchableOpacity 
+              style={globalStyles.secondaryButton}
+              onPress={handleLogin}
+            >
+              <Text style={globalStyles.secondaryButtonText}>Iniciar Sesión</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              onPress={() => navigation.navigate('Signup')}
+            >
+              <Text style={globalStyles.linkText}>¿No tienes cuenta? Regístrate</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

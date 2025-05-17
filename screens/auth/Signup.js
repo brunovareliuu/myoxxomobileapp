@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Text, View, TextInput, TouchableOpacity, Alert, SafeAreaView, Image, StyleSheet } from 'react-native';
+import { Text, View, TextInput, TouchableOpacity, Alert, SafeAreaView, Image, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, getDoc } from 'firebase/firestore';
 import { globalStyles } from '../../styles/globalStyles';
@@ -51,76 +51,86 @@ export default function Signup({ navigation }) {
 
   return (
     <SafeAreaView style={globalStyles.container}>
-      <View style={globalStyles.content}>
-        <View style={globalStyles.compactLogoContainer}>
-          <Image
-            source={require('../../assets/logo.png')}
-            style={globalStyles.compactLogo}
-            resizeMode="contain"
-          />
-        </View>
-
-        <Text style={globalStyles.title}>Crear Cuenta</Text>
-        
-        <TextInput
-          style={globalStyles.input}
-          placeholder="Nombre Completo"
-          placeholderTextColor="#fff"
-          value={nombre}
-          onChangeText={setNombre}
-          autoCapitalize="words"
-        />
-
-        <TextInput
-          style={globalStyles.input}
-          placeholder="Correo electrónico"
-          placeholderTextColor="#fff"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-
-        <TextInput
-          style={globalStyles.input}
-          placeholder="Código de Tienda"
-          placeholderTextColor="#fff"
-          value={codigoTienda}
-          onChangeText={setCodigoTienda}
-          autoCapitalize="none"
-        />
-
-        <TextInput
-          style={globalStyles.input}
-          placeholder="Contraseña"
-          placeholderTextColor="#fff"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-
-        <TextInput
-          style={globalStyles.input}
-          placeholder="Confirmar Contraseña"
-          placeholderTextColor="#fff"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry
-        />
-
-        <TouchableOpacity 
-          style={globalStyles.secondaryButton}
-          onPress={handleSignup}
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <ScrollView 
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
         >
-          <Text style={globalStyles.secondaryButtonText}>Registrarse</Text>
-        </TouchableOpacity>
+          <View style={globalStyles.content}>
+            <View style={globalStyles.compactLogoContainer}>
+              <Image
+                source={require('../../assets/logo.png')}
+                style={globalStyles.compactLogo}
+                resizeMode="contain"
+              />
+            </View>
 
-        <TouchableOpacity 
-          onPress={() => navigation.navigate('Login')}
-        >
-          <Text style={globalStyles.linkText}>¿Ya tienes cuenta? Inicia Sesión</Text>
-        </TouchableOpacity>
-      </View>
+            <Text style={globalStyles.title}>Crear Cuenta</Text>
+            
+            <TextInput
+              style={globalStyles.input}
+              placeholder="Nombre Completo"
+              placeholderTextColor="#fff"
+              value={nombre}
+              onChangeText={setNombre}
+              autoCapitalize="words"
+            />
+
+            <TextInput
+              style={globalStyles.input}
+              placeholder="Correo electrónico"
+              placeholderTextColor="#fff"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            <TextInput
+              style={globalStyles.input}
+              placeholder="Código de Tienda"
+              placeholderTextColor="#fff"
+              value={codigoTienda}
+              onChangeText={setCodigoTienda}
+              autoCapitalize="none"
+            />
+
+            <TextInput
+              style={globalStyles.input}
+              placeholder="Contraseña"
+              placeholderTextColor="#fff"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+
+            <TextInput
+              style={globalStyles.input}
+              placeholder="Confirmar Contraseña"
+              placeholderTextColor="#fff"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+            />
+
+            <TouchableOpacity 
+              style={globalStyles.secondaryButton}
+              onPress={handleSignup}
+            >
+              <Text style={globalStyles.secondaryButtonText}>Registrarse</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              onPress={() => navigation.navigate('Login')}
+            >
+              <Text style={globalStyles.linkText}>¿Ya tienes cuenta? Inicia Sesión</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

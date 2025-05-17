@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { initializeApp } from "firebase/app";
 import { getFirestore } from 'firebase/firestore';
-import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Importar las pantallas
@@ -26,10 +26,8 @@ const firebaseConfig = {
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 
-// Inicializar Auth con persistencia
-const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage)
-});
+// Inicializar Auth
+const auth = getAuth(app);
 
 // Inicializar Firestore
 const db = getFirestore(app);
@@ -47,7 +45,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    const subscriber = auth.onAuthStateChanged(onAuthStateChanged);
+    const subscriber = onAuthStateChanged(auth, onAuthStateChanged);
     return subscriber; // unsubscribe on unmount
   }, []);
 
