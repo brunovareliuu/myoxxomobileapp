@@ -1,43 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, SafeAreaView, StyleSheet } from 'react-native';
-import { getAuth } from 'firebase/auth';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { globalStyles, colors } from '../../styles/globalStyles';
 
 export default function HomeScreen() {
-  const [tiendaInfo, setTiendaInfo] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Datos de ejemplo para la tienda
+  const [tiendaInfo, setTiendaInfo] = useState({
+    nombre: 'DEMO',
+    ciudad: 'Ciudad de Ejemplo',
+  });
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchTiendaInfo = async () => {
-      try {
-        const auth = getAuth();
-        const user = auth.currentUser;
-        
-        if (user) {
-          const db = getFirestore();
-          // Primero obtenemos el documento del usuario para saber su tienda
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            // Asumiendo que el usuario tiene un campo con el código de tienda
-            const tiendaDoc = await getDoc(doc(db, 'tiendas', userData.codigoTienda));
-            
-            if (tiendaDoc.exists()) {
-              setTiendaInfo(tiendaDoc.data());
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error al obtener información de la tienda:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTiendaInfo();
-  }, []);
+  // Ya no se usa useEffect ni fetchTiendaInfo
 
   if (loading) {
     return (

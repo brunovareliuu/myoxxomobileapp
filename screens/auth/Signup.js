@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import { Text, View, TextInput, TouchableOpacity, Alert, SafeAreaView, Image, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, getDoc } from 'firebase/firestore';
 import { globalStyles } from '../../styles/globalStyles';
 
 export default function Signup({ navigation }) {
@@ -11,42 +9,20 @@ export default function Signup({ navigation }) {
   const [nombre, setNombre] = useState('');
   const [codigoTienda, setCodigoTienda] = useState('');
 
-  const handleSignup = async () => {
+  const handleSignup = () => {
+    if (!email || !password || !confirmPassword || !nombre || !codigoTienda) {
+      Alert.alert('Error', 'Por favor completa todos los campos');
+      return;
+    }
+
     if (password !== confirmPassword) {
       Alert.alert('Error', 'Las contraseñas no coinciden');
       return;
     }
 
-    try {
-      // Verificar si existe la tienda
-      const db = getFirestore();
-      const tiendaRef = doc(db, 'tiendas', codigoTienda);
-      const tiendaDoc = await getDoc(tiendaRef);
-
-      if (!tiendaDoc.exists()) {
-        Alert.alert('Error', 'El código de tienda no es válido');
-        return;
-      }
-
-      // Crear usuario en Authentication
-      const auth = getAuth();
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-
-      // Guardar información adicional en Firestore
-      const userRef = doc(db, 'users', userCredential.user.uid);
-      await setDoc(userRef, {
-        email: email,
-        nombre: nombre,
-        rol: 'empleado',
-        uid: userCredential.user.uid,
-        createdAt: new Date().toISOString(),
-      });
-
-      Alert.alert('Éxito', 'Usuario registrado correctamente');
-      navigation.navigate('Login');
-    } catch (error) {
-      Alert.alert('Error', 'Error al registrarse: ' + error.message);
-    }
+    // Simplemente navegar al Login después del registro
+    Alert.alert('Éxito', 'Usuario registrado correctamente');
+    navigation.navigate('Login');
   };
 
   return (

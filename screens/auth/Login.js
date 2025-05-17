@@ -1,20 +1,18 @@
 import React, { useState } from 'react';
 import { Text, View, TextInput, TouchableOpacity, Alert, SafeAreaView, Image, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { globalStyles } from '../../styles/globalStyles';
 
 export default function Login({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogin = async () => {
-    try {
-      const auth = getAuth();
-      await signInWithEmailAndPassword(auth, email, password);
-      navigation.replace('Home');
-    } catch (error) {
-      Alert.alert('Error', 'Error al iniciar sesión: ' + error.message);
+  const handleLogin = () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Por favor completa todos los campos');
+      return;
     }
+    // Simplemente navegar al Home
+    navigation.replace('Home');
   };
 
   return (
