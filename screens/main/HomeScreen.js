@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, SafeAreaView, StyleSheet } from 'react-native';
+import { View, Text, SafeAreaView, StyleSheet, TouchableOpacity } from 'react-native';
 import { globalStyles, colors } from '../../styles/globalStyles';
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
   // Datos de ejemplo para la tienda
   const [tiendaInfo, setTiendaInfo] = useState({
     nombre: 'DEMO',
@@ -30,6 +30,15 @@ export default function HomeScreen() {
           <Text style={styles.storeName}>OXXO {tiendaInfo?.nombre || 'Tienda'}</Text>
           <Text style={styles.locationText}>{tiendaInfo?.ciudad || 'Ciudad'}</Text>
         </View>
+
+        <View style={styles.buttonsContainer}>
+          <TouchableOpacity
+            style={globalStyles.secondaryButton}
+            onPress={() => navigation.navigate('ProductCapture')}
+          >
+            <Text style={globalStyles.secondaryButtonText}>Capturar Productos</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -42,6 +51,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     borderWidth: 1,
     borderColor: colors.white,
+    marginBottom: 30,
   },
   welcomeText: {
     color: colors.secondary,
@@ -61,5 +71,8 @@ const styles = StyleSheet.create({
     fontSize: 20,
     textAlign: 'center',
     opacity: 0.9,
+  },
+  buttonsContainer: {
+    width: '100%',
   },
 }); 
