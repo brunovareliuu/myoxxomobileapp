@@ -28,9 +28,11 @@ export default function HomeScreen({ navigation }) {
         const userId = auth.currentUser?.uid;
         if (!userId) {
           console.error('No hay usuario autenticado');
+          navigation.replace('Login');
           return;
         }
 
+        // Obtener datos del usuario
         const userDocRef = doc(db, 'users', userId);
         const userDocSnap = await getDoc(userDocRef);
 
@@ -58,16 +60,20 @@ export default function HomeScreen({ navigation }) {
             }));
             setTasks(tasksData);
           }
+        } else {
+          console.error('No se encontraron datos del usuario');
+          navigation.replace('Login');
         }
       } catch (error) {
         console.error('Error al cargar datos:', error);
+        navigation.replace('Login');
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [navigation]);
 
   const renderTaskItem = ({ item }) => (
     <TouchableOpacity 
@@ -113,7 +119,7 @@ export default function HomeScreen({ navigation }) {
         <View>
           <Text style={styles.greeting}>Bienvenido,</Text>
           <Text style={styles.userName}>{userData?.nombre || 'Usuario'}</Text>
-          <Text style={styles.storeName}>{tiendaData?.nombre || 'Tienda'}</Text>
+          <Text style={styles.storeName}>{userData?.tiendaNombre || 'Tienda'}</Text>
         </View>
         <Image
           source={require('../../assets/logo.png')}

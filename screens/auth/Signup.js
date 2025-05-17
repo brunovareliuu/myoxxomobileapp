@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Text, View, TextInput, TouchableOpacity, Alert, SafeAreaView, Image, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc, setDoc, query, collection, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import { globalStyles } from '../../styles/globalStyles';
 
@@ -27,7 +27,7 @@ export default function Signup({ navigation }) {
       // Limpiar y normalizar el código de tienda
       const codigoTiendaLimpio = codigoTienda.trim().toUpperCase();
 
-      // Buscar la tienda por el campo codigoTienda
+      // Buscar la tienda por el código
       const tiendasRef = collection(db, 'tiendas');
       const q = query(tiendasRef, where('codigoTienda', '==', codigoTiendaLimpio));
       const querySnapshot = await getDocs(q);
@@ -37,7 +37,7 @@ export default function Signup({ navigation }) {
         return;
       }
 
-      // Tomar el primer documento encontrado
+      // Obtener datos de la tienda
       const tiendaDoc = querySnapshot.docs[0];
       const tiendaData = tiendaDoc.data();
       const tiendaId = tiendaDoc.id;
@@ -46,29 +46,27 @@ export default function Signup({ navigation }) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const uid = userCredential.user.uid;
 
-      // Guardar usuario en la colección global 'users'
-      await setDoc(doc(db, 'users', uid), {
+      // Datos del usuario
+      const userData = {
         email,
         nombre,
         codigoTienda: codigoTiendaLimpio,
+        tiendaNombre: tiendaData.nombre,
         rol: 'app_user',
         uid,
-        createdAt: new Date().toISOString(),
-      });
+        createdAt: new Date().toISOString()
+      };
 
-      // Guardar usuario en la subcolección 'users' de la tienda (usando el ID real de la tienda)
-      await setDoc(doc(db, 'tiendas', tiendaId, 'users', uid), {
-        email,
-        nombre,
-        codigoTienda: codigoTiendaLimpio,
-        rol: 'app_user',
-        uid,
-        createdAt: new Date().toISOString(),
-      });
+      // Guardar en la colección global de users
+      await setDoc(doc(db, 'users', uid), userData);
 
-      // Navegar a HomeScreen y pasar el nombre de la tienda
-      navigation.replace('Home', { tiendaNombre: tiendaData.nombre });
+      // Guardar en la subcolección users de la tienda
+      await setDoc(doc(db, 'tiendas', tiendaId, 'users', uid), userData);
+
+      // Navegar a MainApp
+      navigation.replace('MainApp');
     } catch (error) {
+      console.error('Error de registro:', error);
       Alert.alert('Error', 'No se pudo registrar: ' + error.message);
     }
   };

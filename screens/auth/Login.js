@@ -1,18 +1,28 @@
 import React, { useState } from 'react';
 import { Text, View, TextInput, TouchableOpacity, Alert, SafeAreaView, Image, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../config/firebase';
 import { globalStyles } from '../../styles/globalStyles';
 
 export default function Login({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Error', 'Por favor completa todos los campos');
       return;
     }
-    // Simplemente navegar al Home
-    navigation.replace('MainApp');
+
+    try {
+      // Intentar iniciar sesión con Firebase Auth
+      await signInWithEmailAndPassword(auth, email, password);
+      // Si la autenticación es exitosa, navegar a MainApp
+      navigation.replace('MainApp');
+    } catch (error) {
+      console.error('Error de inicio de sesión:', error);
+      Alert.alert('Error', 'Credenciales inválidas');
+    }
   };
 
   return (
