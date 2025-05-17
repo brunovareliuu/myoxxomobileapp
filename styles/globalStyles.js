@@ -77,11 +77,16 @@ export const globalStyles = StyleSheet.create({
   },
   compactLogoContainer: {
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: -20,
   },
   compactLogo: {
     width: 150,
     height: 150,
+    transform: [{rotate: '-10deg'}],
+  },
+  largeLogo: {
+    width: 280,
+    height: 280,
     transform: [{rotate: '-10deg'}],
   },
 }); 

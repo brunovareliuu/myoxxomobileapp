@@ -1,34 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { View, Text, SafeAreaView, StyleSheet } from 'react-native';
 import { globalStyles, colors } from '../../styles/globalStyles';
 
-export default function HomeScreen() {
-  // Datos de ejemplo para la tienda
-  const [tiendaInfo, setTiendaInfo] = useState({
-    nombre: 'DEMO',
-    ciudad: 'Ciudad de Ejemplo',
-  });
-  const [loading, setLoading] = useState(false);
-
-  // Ya no se usa useEffect ni fetchTiendaInfo
-
-  if (loading) {
-    return (
-      <SafeAreaView style={globalStyles.container}>
-        <View style={globalStyles.content}>
-          <Text style={globalStyles.title}>Cargando...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+export default function HomeScreen({ route }) {
+  // Recibe el nombre de la tienda por params
+  const tiendaNombre = route?.params?.tiendaNombre || 'Tienda';
+  const tiendaCiudad = 'Ciudad de Ejemplo'; // Puedes cambiar esto si tienes la ciudad
 
   return (
     <SafeAreaView style={globalStyles.container}>
       <View style={globalStyles.content}>
         <View style={styles.infoContainer}>
           <Text style={styles.welcomeText}>Bienvenido a</Text>
-          <Text style={styles.storeName}>OXXO {tiendaInfo?.nombre || 'Tienda'}</Text>
-          <Text style={styles.locationText}>{tiendaInfo?.ciudad || 'Ciudad'}</Text>
+          <Text style={styles.storeName}>OXXO {tiendaNombre}</Text>
+          <Text style={styles.locationText}>{tiendaCiudad}</Text>
         </View>
       </View>
     </SafeAreaView>

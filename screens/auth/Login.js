@@ -29,7 +29,7 @@ export default function Login({ navigation }) {
             <View style={globalStyles.compactLogoContainer}>
               <Image
                 source={require('../../assets/logo.png')}
-                style={globalStyles.compactLogo}
+                style={globalStyles.largeLogo}
                 resizeMode="contain"
               />
             </View>
