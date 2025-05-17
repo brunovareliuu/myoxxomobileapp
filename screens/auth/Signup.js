@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Text, View, TextInput, TouchableOpacity, Alert, SafeAreaView, Image, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../config/firebase';
 import { globalStyles } from '../../styles/globalStyles';
 
 export default function Signup({ navigation }) {
@@ -9,7 +11,7 @@ export default function Signup({ navigation }) {
   const [nombre, setNombre] = useState('');
   const [codigoTienda, setCodigoTienda] = useState('');
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     if (!email || !password || !confirmPassword || !nombre || !codigoTienda) {
       Alert.alert('Error', 'Por favor completa todos los campos');
       return;
@@ -20,9 +22,13 @@ export default function Signup({ navigation }) {
       return;
     }
 
-    // Simplemente navegar al Login después del registro
-    Alert.alert('Éxito', 'Usuario registrado correctamente');
-    navigation.navigate('Login');
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+      // Usuario creado exitosamente, navegar a Home
+      navigation.replace('Home');
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo registrar: ' + error.message);
+    }
   };
 
   return (
