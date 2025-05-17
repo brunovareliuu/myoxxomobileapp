@@ -106,7 +106,7 @@ export default function HomeScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <StatusBar backgroundColor={colors.primary} barStyle="light-content" />
+        <StatusBar backgroundColor={colors.primary} barStyle="light-content" translucent={false} />
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
@@ -114,7 +114,7 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar backgroundColor={colors.primary} barStyle="light-content" />
+      <StatusBar backgroundColor={colors.primary} barStyle="light-content" translucent={false} />
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Bienvenido,</Text>

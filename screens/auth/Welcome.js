@@ -18,16 +18,16 @@ export default function Welcome({ navigation }) {
           <Text style={styles.title}>¡Bienvenido!</Text>
           <Text style={styles.subtitle}>Captura y gestiona tu inventario de manera eficiente</Text>
         </View>
-
+        
         <View style={styles.buttonsContainer}>
-          <TouchableOpacity
+          <TouchableOpacity 
             style={[globalStyles.secondaryButton, styles.button]}
             onPress={() => navigation.navigate('Login')}
           >
             <Text style={globalStyles.secondaryButtonText}>Iniciar Sesión</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
+          <TouchableOpacity 
             style={[globalStyles.primaryButton, styles.button]}
             onPress={() => navigation.navigate('Signup')}
           >

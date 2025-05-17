@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
+import { View, Text, SafeAreaView, StyleSheet, StatusBar } from 'react-native';
 import { colors } from '../../styles/globalStyles';
 
 export default function TaskManagerScreen() {
@@ -7,10 +7,10 @@ export default function TaskManagerScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar backgroundColor={colors.primary} barStyle="light-content" />
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Administrador de Tareas</Text>
+        <Text style={styles.headerTitle}>Gestor de Tareas</Text>
       </View>
       <View style={styles.content}>
-        <Text style={styles.placeholder}>Próximamente: Administración de tareas</Text>
+        <Text>Gestor de tareas en construcción</Text>
       </View>
     </SafeAreaView>
   );
@@ -27,19 +27,14 @@ const styles = StyleSheet.create({
     paddingTop: 40,
   },
   headerTitle: {
-    color: colors.white,
     fontSize: 24,
     fontWeight: 'bold',
+    color: colors.white,
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: 20,
-  },
-  placeholder: {
-    fontSize: 16,
-    color: colors.textLight,
-    textAlign: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 }); 

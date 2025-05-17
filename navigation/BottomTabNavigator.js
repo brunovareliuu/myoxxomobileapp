@@ -1,37 +1,31 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../styles/globalStyles';
 
-// Importar las pantallas
+// Importar pantallas
 import HomeScreen from '../screens/main/HomeScreen';
-import ProductCaptureScreen from '../screens/main/ProductCaptureScreen';
-import AlertScreen from '../screens/main/AlertScreen';
+import SearchScreen from '../screens/main/SearchScreen';
+import TaskManagerScreen from '../screens/main/TaskManagerScreen';
+import ProfileScreen from '../screens/main/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
-
-const CameraButton = () => (
-  <View style={styles.cameraButton}>
-    <Icon name="add-a-photo" size={28} color={colors.white} />
-  </View>
-);
 
 export default function BottomTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={{
+        headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.primary,
-          borderTopWidth: 0,
-          elevation: 10,
+          backgroundColor: colors.white,
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,
+          borderTopWidth: 1,
+          borderTopColor: colors.primary,
         },
-        tabBarActiveTintColor: colors.white,
-        tabBarInactiveTintColor: 'rgba(255,255,255,0.6)',
-        headerShown: false,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: '#999',
       }}
     >
       <Tab.Screen
@@ -39,41 +33,41 @@ export default function BottomTabNavigator() {
         component={HomeScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Icon name="home" size={28} color={color} />
+            <Icon name="home" size={size} color={color} />
           ),
+          tabBarLabel: 'Inicio'
         }}
       />
       <Tab.Screen
-        name="Camera"
-        component={ProductCaptureScreen}
-        options={{
-          tabBarIcon: ({ focused }) => <CameraButton />,
-          tabBarLabel: () => null,
-        }}
-      />
-      <Tab.Screen
-        name="Alerts"
-        component={AlertScreen}
+        name="Search"
+        component={SearchScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Icon name="error-outline" size={28} color={color} />
+            <Icon name="search" size={size} color={color} />
           ),
+          tabBarLabel: 'Buscar'
+        }}
+      />
+      <Tab.Screen
+        name="Tasks"
+        component={TaskManagerScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="assignment" size={size} color={color} />
+          ),
+          tabBarLabel: 'Tareas'
+        }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="person" size={size} color={color} />
+          ),
+          tabBarLabel: 'Perfil'
         }}
       />
     </Tab.Navigator>
   );
-}
-
-const styles = StyleSheet.create({
-  cameraButton: {
-    backgroundColor: colors.primary,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    marginBottom: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: colors.white,
-  },
-}); 
+} 
