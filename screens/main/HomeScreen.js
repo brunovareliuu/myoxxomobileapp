@@ -12,7 +12,7 @@ export default function HomeScreen({ route }) {
       <View style={globalStyles.content}>
         <View style={styles.infoContainer}>
           <Text style={styles.welcomeText}>Bienvenido a</Text>
-          <Text style={styles.storeName}>OXXO {tiendaNombre}</Text>
+          <Text style={styles.storeName}> {tiendaNombre}</Text>
           <Text style={styles.locationText}>{tiendaCiudad}</Text>
         </View>
       </View>

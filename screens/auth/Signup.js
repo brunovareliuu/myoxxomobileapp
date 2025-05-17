@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Text, View, TextInput, TouchableOpacity, Alert, SafeAreaView, Image, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import { globalStyles } from '../../styles/globalStyles';
 
@@ -24,40 +24,49 @@ export default function Signup({ navigation }) {
     }
 
     try {
-      // 1. Verificar si la tienda existe
-      const tiendaRef = doc(db, 'tiendas', codigoTienda);
-      const tiendaSnap = await getDoc(tiendaRef);
-      if (!tiendaSnap.exists()) {
-        Alert.alert('Error', 'El código de tienda no existe');
+      // Limpiar y normalizar el código de tienda
+      const codigoTiendaLimpio = codigoTienda.trim().toUpperCase();
+
+      // Buscar la tienda por el campo codigoTienda
+      const tiendasRef = collection(db, 'tiendas');
+      const q = query(tiendasRef, where('codigoTienda', '==', codigoTiendaLimpio));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        Alert.alert('Error', `El código de tienda "${codigoTiendaLimpio}" no existe`);
         return;
       }
-      const tiendaData = tiendaSnap.data();
 
-      // 2. Crear usuario en Auth
+      // Tomar el primer documento encontrado
+      const tiendaDoc = querySnapshot.docs[0];
+      const tiendaData = tiendaDoc.data();
+      const tiendaId = tiendaDoc.id;
+
+      // Crear usuario en Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const uid = userCredential.user.uid;
 
-      // 3. Guardar usuario en la colección global 'users'
+      // Guardar usuario en la colección global 'users'
       await setDoc(doc(db, 'users', uid), {
         email,
         nombre,
-        codigoTienda,
-        rol: 'empleado',
+        codigoTienda: codigoTiendaLimpio,
+        rol: 'app_user',
         uid,
         createdAt: new Date().toISOString(),
       });
 
-      // 4. Guardar usuario en la subcolección 'users' de la tienda
-      await setDoc(doc(db, 'tiendas', codigoTienda, 'users', uid), {
+      // Guardar usuario en la subcolección 'users' de la tienda (usando el ID real de la tienda)
+      await setDoc(doc(db, 'tiendas', tiendaId, 'users', uid), {
         email,
         nombre,
-        codigoTienda,
-        rol: 'empleado',
+        codigoTienda: codigoTiendaLimpio,
+        rol: 'app_user',
         uid,
         createdAt: new Date().toISOString(),
       });
 
-      // 5. Navegar a HomeScreen y pasar el nombre de la tienda
+      // Navegar a HomeScreen y pasar el nombre de la tienda
       navigation.replace('Home', { tiendaNombre: tiendaData.nombre });
     } catch (error) {
       Alert.alert('Error', 'No se pudo registrar: ' + error.message);
@@ -78,7 +87,7 @@ export default function Signup({ navigation }) {
             <View style={globalStyles.compactLogoContainer}>
               <Image
                 source={require('../../assets/logo.png')}
-                style={globalStyles.largeLogo}
+                style={globalStyles.compactLogo}
                 resizeMode="contain"
               />
             </View>
