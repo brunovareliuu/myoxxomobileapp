@@ -2,6 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { initializeApp } from "firebase/app";
+import { getFirestore } from 'firebase/firestore';
 
 // Importar las pantallas
 import Welcome from './screens/auth/Welcome';
@@ -20,7 +21,9 @@ const firebaseConfig = {
 };
 
 // Inicializar Firebase
-initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
+// Inicializar Firestore
+const db = getFirestore(app);
 
 const Stack = createNativeStackNavigator();
 

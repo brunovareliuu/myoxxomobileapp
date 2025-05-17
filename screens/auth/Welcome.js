@@ -1,67 +1,56 @@
 import React from 'react';
-import { StyleSheet, Text, View, Image, TouchableOpacity } from 'react-native';
+import { Text, View, Image, TouchableOpacity, SafeAreaView, StyleSheet } from 'react-native';
+import { globalStyles, colors } from '../../styles/globalStyles';
 
 export default function Welcome({ navigation }) {
   return (
-    <View style={styles.container}>
-      <View style={styles.logoContainer}>
-        <Image
-          source={require('../../assets/logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-      </View>
-      
-      <View style={styles.buttonsContainer}>
-        <TouchableOpacity 
-          style={styles.button}
-          onPress={() => navigation.navigate('Login')}
-        >
-          <Text style={styles.buttonText}>Iniciar Sesión</Text>
-        </TouchableOpacity>
+    <SafeAreaView style={globalStyles.container}>
+      <View style={globalStyles.content}>
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={globalStyles.title}>Empieza tu Optimización</Text>
+          <Text style={globalStyles.subtitle}>Entra a una tienda o inicia sesión</Text>
+        </View>
+        
+        <View style={styles.buttonsContainer}>
+          <TouchableOpacity 
+            style={globalStyles.primaryButton}
+            onPress={() => navigation.navigate('Login')}
+          >
+            <Text style={globalStyles.primaryButtonText}>Login</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.button, styles.signupButton]}
-          onPress={() => navigation.navigate('Signup')}
-        >
-          <Text style={styles.buttonText}>Registrarse</Text>
-        </TouchableOpacity>
+          <TouchableOpacity 
+            style={globalStyles.secondaryButton}
+            onPress={() => navigation.navigate('Signup')}
+          >
+            <Text style={globalStyles.secondaryButtonText}>Sign Up</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    padding: 20,
-  },
   logoContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   logo: {
-    width: 200,
-    height: 200,
+    width: 325,
+    height: 325,
+    marginBottom: 20,
+    transform: 'rotate(-10deg)',
   },
   buttonsContainer: {
-    marginBottom: 50,
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 10,
-    marginVertical: 10,
-  },
-  signupButton: {
-    backgroundColor: '#34C759',
-  },
-  buttonText: {
-    color: 'white',
-    textAlign: 'center',
-    fontSize: 16,
-    fontWeight: 'bold',
+    width: '100%',
+    paddingHorizontal: 20,
+    marginBottom: 30,
   },
 }); 
