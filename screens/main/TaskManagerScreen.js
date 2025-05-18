@@ -16,14 +16,14 @@ import { colors } from '../../styles/globalStyles';
 
 export default function TaskManagerScreen({ navigation }) {
   const [activeTab, setActiveTab] = useState('activas');
-  const [tasks, setTasks] = useState([]);
+  const [solicitudes, setSolicitudes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadTasks();
+    loadSolicitudes();
   }, [activeTab]);
 
-  const loadTasks = async () => {
+  const loadSolicitudes = async () => {
     try {
       setLoading(true);
       const userId = auth.currentUser?.uid;
@@ -45,19 +45,19 @@ export default function TaskManagerScreen({ navigation }) {
 
         if (!tiendaSnapshot.empty) {
           const tiendaDoc = tiendaSnapshot.docs[0];
-          const tareasRef = collection(db, 'tiendas', tiendaDoc.id, 'tareas');
+          const solicitudesRef = collection(db, 'tiendas', tiendaDoc.id, 'solicitudes');
           
-          // Obtener todas las tareas y filtrar en el cliente
-          const tareasSnapshot = await getDocs(tareasRef);
-          const todasLasTareas = tareasSnapshot.docs.map(doc => ({
+          // Obtener todas las solicitudes y filtrar en el cliente
+          const solicitudesSnapshot = await getDocs(solicitudesRef);
+          const todasLasSolicitudes = solicitudesSnapshot.docs.map(doc => ({
             id: doc.id,
             tiendaId: tiendaDoc.id,
             ...doc.data()
           }));
 
-          // Filtrar y ordenar en el cliente según la pestaña activa
-          const tareasData = todasLasTareas
-            .filter(tarea => activeTab === 'completadas' ? tarea.completada : !tarea.completada)
+          // Filtrar y ordenar según la pestaña activa
+          const solicitudesFiltradas = todasLasSolicitudes
+            .filter(solicitud => activeTab === 'completadas' ? solicitud.completada : !solicitud.completada)
             .sort((a, b) => {
               if (activeTab === 'completadas') {
                 return new Date(b.fechaCompletado || 0) - new Date(a.fechaCompletado || 0);
@@ -65,79 +65,69 @@ export default function TaskManagerScreen({ navigation }) {
               return new Date(a.fechaLimite) - new Date(b.fechaLimite);
             });
           
-          console.log(`Tareas ${activeTab}:`, tareasData.length);
-          setTasks(tareasData);
+          setSolicitudes(solicitudesFiltradas);
         }
       }
     } catch (error) {
-      console.error('Error al cargar tareas:', error);
+      console.error('Error al cargar solicitudes:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const renderTaskItem = ({ item }) => (
+  const renderSolicitudItem = ({ item }) => (
     <TouchableOpacity 
-      style={styles.taskCard}
-      onPress={() => navigation.navigate(activeTab === 'completadas' ? 'ResultsInformation' : 'TaskDetail', { 
-        taskId: item.id,
+      style={styles.solicitudCard}
+      onPress={() => navigation.navigate('TaskDetail', { 
+        solicitudId: item.id,
         tiendaId: item.tiendaId 
       })}
     >
-      <View style={styles.taskHeader}>
-        <View style={styles.taskHeaderLeft}>
-          <Text style={styles.taskTitle}>{item.titulo}</Text>
-          <Text style={styles.taskDescription} numberOfLines={2}>
-            {item.descripcion}
+      <View style={styles.cardHeader}>
+        <Text style={styles.titulo}>{item.titulo}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: item.completada ? colors.success : colors.warning }]}>
+          <Text style={styles.statusText}>
+            {item.completada ? 'COMPLETADO' : 'PENDIENTE'}
           </Text>
-        </View>
-        <View style={[styles.taskPriority, { backgroundColor: getPriorityColor(item.prioridad) }]}>
-          <Text style={styles.taskPriorityText}>{item.prioridad}</Text>
         </View>
       </View>
 
-      <View style={styles.taskInfo}>
-        <View style={styles.taskInfoRow}>
+      <Text style={styles.descripcion} numberOfLines={2}>
+        {item.descripcion}
+      </Text>
+
+      <View style={styles.infoContainer}>
+        <View style={styles.infoRow}>
           <Icon name="event" size={16} color={colors.textLight} />
-          <Text style={styles.taskInfoText}>
-            {activeTab === 'completadas' ? 'Completada: ' + new Date(item.fechaCompletado).toLocaleDateString() : 
-             'Límite: ' + new Date(item.fechaLimite).toLocaleDateString()}
+          <Text style={styles.infoText}>
+            {item.completada ? 
+              `Completada: ${new Date(item.fechaCompletado).toLocaleDateString()}` : 
+              `Límite: ${new Date(item.fechaLimite).toLocaleDateString()}`}
           </Text>
         </View>
-        <View style={styles.taskInfoRow}>
+
+        <View style={styles.infoRow}>
           <Icon name="store" size={16} color={colors.textLight} />
-          <Text style={styles.taskInfoText}>
+          <Text style={styles.infoText}>
             Planograma: {item.planogramaNombre}
           </Text>
         </View>
-        <View style={styles.taskInfoRow}>
-          <Icon name="schedule" size={16} color={colors.textLight} />
-          <Text style={styles.taskInfoText}>
-            Turno: {item.turno}
+
+        <View style={styles.infoRow}>
+          <Icon name="person" size={16} color={colors.textLight} />
+          <Text style={styles.infoText}>
+            Creada por: {item.creadaPor}
           </Text>
         </View>
       </View>
     </TouchableOpacity>
   );
 
-  const getPriorityColor = (priority) => {
-    switch (priority?.toLowerCase()) {
-      case 'alta':
-        return '#FF4444';
-      case 'media':
-        return '#FFBB33';
-      case 'baja':
-        return '#00C851';
-      default:
-        return colors.primary;
-    }
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar backgroundColor={colors.primary} barStyle="light-content" />
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Gestor de Tareas</Text>
+        <Text style={styles.headerTitle}>Gestor de Solicitudes</Text>
       </View>
 
       <View style={styles.tabContainer}>
@@ -165,10 +155,10 @@ export default function TaskManagerScreen({ navigation }) {
         </View>
       ) : (
         <FlatList
-          data={tasks}
-          renderItem={renderTaskItem}
+          data={solicitudes}
+          renderItem={renderSolicitudItem}
           keyExtractor={item => item.id}
-          contentContainerStyle={styles.tasksList}
+          contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Icon 
@@ -177,7 +167,7 @@ export default function TaskManagerScreen({ navigation }) {
                 color={colors.textLight} 
               />
               <Text style={styles.emptyText}>
-                No hay tareas {activeTab === 'activas' ? 'pendientes' : 'completadas'}
+                No hay solicitudes {activeTab === 'activas' ? 'pendientes' : 'completadas'}
               </Text>
             </View>
           }
@@ -230,8 +220,64 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  tasksList: {
+  listContainer: {
     padding: 15,
+  },
+  solicitudCard: {
+    backgroundColor: colors.white,
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  titulo: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text,
+    flex: 1,
+    marginRight: 10,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 15,
+  },
+  statusText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  descripcion: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginBottom: 10,
+  },
+  infoContainer: {
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 10,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  infoText: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginLeft: 8,
   },
   emptyContainer: {
     flex: 1,
@@ -243,65 +289,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textLight,
     marginTop: 10,
-  },
-  taskCard: {
-    backgroundColor: colors.white,
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 15,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  taskHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 10,
-  },
-  taskHeaderLeft: {
-    flex: 1,
-    marginRight: 10,
-  },
-  taskTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 5,
-  },
-  taskDescription: {
-    fontSize: 14,
-    color: colors.textLight,
-    marginBottom: 10,
-  },
-  taskPriority: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
-  },
-  taskPriorityText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-  },
-  taskInfo: {
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingTop: 10,
-  },
-  taskInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  taskInfoText: {
-    fontSize: 14,
-    color: colors.textLight,
-    marginLeft: 8,
   },
 }); 

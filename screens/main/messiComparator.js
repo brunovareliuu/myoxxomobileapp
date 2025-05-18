@@ -81,6 +81,7 @@ export async function processImageAndCompare(imageData, planograma, options = {}
       // Calcular los puntos de las esquinas inferiores
       const bottomLeft = { x: x1, y: y2 };
       const bottomRight = { x: x2, y: y2 };
+      const bottomCenter = { x: pixelX, y: y2 };
       
       return {
         ...pred,
@@ -93,18 +94,22 @@ export async function processImageAndCompare(imageData, planograma, options = {}
         x2,
         y2,
         bottomLeft,
-        bottomRight
+        bottomRight,
+        bottomCenter
       };
     });
     
-    // Paso 3: Organizar productos por estantes (de abajo hacia arriba)
-    const barcodesArray = organizeProductsByShelf(enhancedPredictions, config);
+    // Paso 3: Organizar productos por estantes y generar arrays necesarios
+    const result = organizeProductsByShelf(enhancedPredictions, config);
     
     // Paso 4: Comparar con el planograma
-    const comparacion = messiComparations(planograma, barcodesArray);
+    const comparacion = messiComparations(planograma, result.barcodesArray);
     
     return {
-      barcodesArray,
+      barcodesArray: result.barcodesArray,
+      namesArray: result.namesArray,
+      positionsArray: result.positionsArray,
+      nestedArray: result.nestedArray,
       comparacion,
       imageSize
     };
@@ -113,6 +118,9 @@ export async function processImageAndCompare(imageData, planograma, options = {}
     console.error('Error procesando la imagen:', error);
     return {
       barcodesArray: [],
+      namesArray: [],
+      positionsArray: [],
+      nestedArray: [],
       comparacion: { discrepancias: [], movimientos: [] },
       error: error.message || 'Error desconocido al procesar la imagen'
     };
@@ -120,19 +128,93 @@ export async function processImageAndCompare(imageData, planograma, options = {}
 }
 
 /**
- * Organiza los productos por estantes y genera el array de códigos de barras
+ * Extrae el nombre del producto de la clase completa (sin la parte del código)
+ * 
+ * @param {string} className - Nombre completo de la clase/producto
+ * @returns {string} - Nombre del producto extraído
+ */
+function extractProductName(className) {
+  if (!className) return '';
+  
+  // Si tiene un guion, extraer la parte después del guion
+  const dashIndex = className.indexOf('-');
+  if (dashIndex > -1) {
+    return className.substring(dashIndex + 1).trim();
+  }
+  
+  return className;
+}
+
+/**
+ * Extrae el código de barras (parte numérica antes del guion)
+ * 
+ * @param {string} className - Nombre completo de la clase/producto
+ * @returns {string} - Código de barras extraído
+ */
+function extractBarcode(className) {
+  if (!className) return '';
+  
+  // Si tiene un guion, extraer la parte antes del guion
+  const dashIndex = className.indexOf('-');
+  if (dashIndex > -1) {
+    return className.substring(0, dashIndex).trim();
+  }
+  
+  // Si no tiene guion, devolver el nombre original
+  return className;
+}
+
+/**
+ * Calcula la distancia entre dos productos
+ * 
+ * @param {Object} prod1 - Primer producto
+ * @param {Object} prod2 - Segundo producto
+ * @returns {Object} - Distancias calculadas
+ */
+function calculateDistance(prod1, prod2) {
+  // Usar esquinas inferiores izquierdas en lugar de centros
+  const x1 = prod1.bottomLeft.x;
+  const y1 = prod1.bottomLeft.y;
+  const x2 = prod2.bottomLeft.x;
+  const y2 = prod2.bottomLeft.y;
+  
+  // Calcular distancia euclidiana
+  const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+  
+  // Calcular distancia horizontal
+  const horizontalDistance = Math.abs(x2 - x1);
+  
+  // Calcular distancia vertical
+  const verticalDistance = Math.abs(y2 - y1);
+  
+  return {
+    euclidean: Math.round(distance),
+    horizontal: Math.round(horizontalDistance),
+    vertical: Math.round(verticalDistance)
+  };
+}
+
+/**
+ * Organiza los productos por estantes y genera arrays necesarios
  * 
  * @param {Array} predictions - Predicciones con coordenadas mejoradas
  * @param {Object} config - Configuración y umbrales
- * @returns {Array<Array<string>>} - Array anidado de códigos de barras con EMPTYs
+ * @returns {Object} - Objeto con los diferentes arrays generados
  */
 function organizeProductsByShelf(predictions, config) {
-  if (!predictions || predictions.length === 0) return [];
+  if (!predictions || predictions.length === 0) {
+    return {
+      barcodesArray: [],
+      namesArray: [],
+      positionsArray: [],
+      nestedArray: []
+    };
+  }
   
-  // Ordenar productos por coordenada Y (de arriba hacia abajo)
+  // Paso 1: Ordenar productos por coordenada Y del borde inferior (de arriba hacia abajo)
   const sortedByY = [...predictions].sort((a, b) => a.bottomLeft.y - b.bottomLeft.y);
   
-  // Agrupar en estantes usando el umbral configurado
+  // Paso 2: Agrupar en estantes usando el umbral configurado
   const shelves = [];
   let currentShelf = [sortedByY[0]];
   let baselineY = sortedByY[0].bottomLeft.y;
@@ -157,24 +239,65 @@ function organizeProductsByShelf(predictions, config) {
   // Añadir el último estante
   shelves.push(currentShelf);
   
-  // Ordenar estantes de abajo hacia arriba (mayor Y a menor Y)
+  // Paso 3: Ordenar estantes de abajo hacia arriba (mayor Y a menor Y)
   const shelvesSortedBottomToTop = [...shelves].sort((a, b) => {
     const avgYA = a.reduce((sum, prod) => sum + prod.bottomLeft.y, 0) / a.length;
     const avgYB = b.reduce((sum, prod) => sum + prod.bottomLeft.y, 0) / b.length;
     return avgYB - avgYA; // Orden descendente (de abajo hacia arriba)
   });
   
-  // Para cada estante, ordenar productos de izquierda a derecha y detectar espacios vacíos
-  const barcodesArray = shelvesSortedBottomToTop.map(shelf => {
-    // Si solo hay un producto, no hay espacios vacíos que detectar
+  // Paso 4: Para cada estante, ordenar productos de izquierda a derecha
+  const organizedShelves = shelvesSortedBottomToTop.map(shelf => {
+    return shelf.sort((a, b) => a.bottomLeft.x - b.bottomLeft.x);
+  });
+  
+  // Paso 5: Añadir índices de estante y producto a cada producto
+  const shelvesWithIndices = organizedShelves.map((shelf, shelfIndex) => {
+    return shelf.map((product, productIndex) => {
+      return {
+        ...product,
+        shelfIndex,
+        productIndex
+      };
+    });
+  });
+  
+  // GENERAR LOS ARRAYS ANIDADOS
+  
+  // 1. Array de nombres de productos (sin espacios vacíos)
+  const namesArray = shelvesWithIndices.map(shelf => {
+    return shelf.map(product => extractProductName(product.class));
+  });
+  
+  // 2. Arrays para códigos de barras y posiciones (con detección de espacios vacíos)
+  const barcodesArray = [];
+  const positionsArray = [];
+  
+  // Procesar cada estante
+  shelvesWithIndices.forEach((shelf, shelfIndex) => {
+    // Inicializar arrays para este estante
+    barcodesArray[shelfIndex] = [];
+    positionsArray[shelfIndex] = [];
+    
+    // Si solo hay un producto en el estante, procesarlo directamente
     if (shelf.length <= 1) {
-      return [extractBarcode(shelf[0].class)];
+      const product = shelf[0];
+      barcodesArray[shelfIndex].push(extractBarcode(product.class));
+      positionsArray[shelfIndex].push({
+        name: extractProductName(product.class),
+        barcode: extractBarcode(product.class),
+        position: {
+          x: product.bottomLeft.x,
+          y: product.bottomLeft.y
+        }
+      });
+      return;
     }
     
-    // Ordenar productos de izquierda a derecha
+    // Ordenar productos por coordenada X
     const sortedByX = [...shelf].sort((a, b) => a.bottomLeft.x - b.bottomLeft.x);
     
-    // Calcular distancias horizontales entre productos adyacentes
+    // Calcular distancias entre productos adyacentes
     const distances = [];
     for (let i = 0; i < sortedByX.length - 1; i++) {
       const dist = sortedByX[i+1].bottomLeft.x - (sortedByX[i].bottomLeft.x + sortedByX[i].pixelWidth);
@@ -182,57 +305,113 @@ function organizeProductsByShelf(predictions, config) {
     }
     
     // Calcular promedio y desviación estándar
-    const avgDistance = distances.reduce((sum, d) => sum + d, 0) / distances.length;
-    const variance = distances.reduce((sum, d) => sum + Math.pow(d - avgDistance, 2), 0) / distances.length;
+    const avgDistance = distances.reduce((sum, d) => sum + d, 0) / distances.length || 0;
+    const variance = distances.reduce((sum, d) => sum + Math.pow(d - avgDistance, 2), 0) / distances.length || 0;
     const stdDev = Math.sqrt(variance);
     
     // Umbral para considerar un espacio vacío
     const emptyThreshold = avgDistance + config.emptyThresholdMultiplier * stdDev;
     
-    // Crear array con códigos de barras y espacios vacíos
-    const result = [extractBarcode(sortedByX[0].class)];
+    // Procesar el primer producto
+    const firstProduct = sortedByX[0];
+    barcodesArray[shelfIndex].push(extractBarcode(firstProduct.class));
+    positionsArray[shelfIndex].push({
+      name: extractProductName(firstProduct.class),
+      barcode: extractBarcode(firstProduct.class),
+      position: {
+        x: firstProduct.bottomLeft.x,
+        y: firstProduct.bottomLeft.y
+      }
+    });
     
+    // Procesar el resto de productos y detectar espacios vacíos
     for (let i = 0; i < sortedByX.length - 1; i++) {
-      const dist = sortedByX[i+1].bottomLeft.x - (sortedByX[i].bottomLeft.x + sortedByX[i].pixelWidth);
+      const prod1 = sortedByX[i];
+      const prod2 = sortedByX[i+1];
+      const dist = prod2.bottomLeft.x - (prod1.bottomLeft.x + prod1.pixelWidth);
       
-      // Si la distancia supera el umbral, agregar EMPTYs
+      // Si la distancia supera el umbral, agregar espacios vacíos
       if (dist > emptyThreshold) {
         // Calcular cuántos EMPTYs agregar
         const numEmptySpaces = Math.round(dist / avgDistance) - 1;
-        
-        // Agregar hasta 2 EMPTYs para espacios grandes
         const emptyTags = Math.min(numEmptySpaces, 2);
+        
         for (let j = 0; j < emptyTags; j++) {
-          result.push("EMPTY");
+          // Posición estimada del espacio vacío
+          const emptyX = (prod1.bottomLeft.x + prod1.pixelWidth) + (j + 1) * (dist / (emptyTags + 1));
+          
+          // Agregar EMPTY a los arrays
+          barcodesArray[shelfIndex].push("EMPTY");
+          positionsArray[shelfIndex].push({
+            name: "EMPTY",
+            barcode: "EMPTY",
+            position: {
+              x: emptyX,
+              y: (prod1.bottomLeft.y + prod2.bottomLeft.y) / 2
+            }
+          });
         }
       }
       
-      result.push(extractBarcode(sortedByX[i+1].class));
+      // Agregar el siguiente producto
+      barcodesArray[shelfIndex].push(extractBarcode(prod2.class));
+      positionsArray[shelfIndex].push({
+        name: extractProductName(prod2.class),
+        barcode: extractBarcode(prod2.class),
+        position: {
+          x: prod2.bottomLeft.x,
+          y: prod2.bottomLeft.y
+        }
+      });
     }
-    
-    return result;
   });
   
-  return barcodesArray;
-}
-
-/**
- * Extrae el código de barras (parte numérica antes del guion)
- * 
- * @param {string} className - Nombre completo de la clase/producto
- * @returns {string} - Código de barras extraído
- */
-function extractBarcode(className) {
-  if (!className) return '';
+  // 3. Array anidado simplificado (con nombres y EMPTYs)
+  const nestedArray = positionsArray.map(shelf => 
+    shelf.map(item => item.name)
+  );
   
-  // Si tiene un guion, extraer la parte antes del guion
-  const dashIndex = className.indexOf('-');
-  if (dashIndex > -1) {
-    return className.substring(0, dashIndex).trim();
-  }
+  // Calcular distancias entre productos vecinos
+  const shelvesWithDistances = shelvesWithIndices.map(shelf => {
+    // Si solo hay un producto en el estante, no hay distancias que calcular
+    if (shelf.length <= 1) return shelf;
+    
+    // Calcular distancias entre productos vecinos
+    return shelf.map((product, index) => {
+      if (index === 0) {
+        // Primer producto, solo calcular distancia al siguiente
+        const distanceToNext = calculateDistance(product, shelf[1]);
+        return {
+          ...product,
+          distanceToNext
+        };
+      } else if (index === shelf.length - 1) {
+        // Último producto, solo calcular distancia al anterior
+        const distanceToPrevious = calculateDistance(product, shelf[index - 1]);
+        return {
+          ...product,
+          distanceToPrevious
+        };
+      } else {
+        // Producto intermedio, calcular distancia a ambos vecinos
+        const distanceToPrevious = calculateDistance(product, shelf[index - 1]);
+        const distanceToNext = calculateDistance(product, shelf[index + 1]);
+        return {
+          ...product,
+          distanceToPrevious,
+          distanceToNext
+        };
+      }
+    });
+  });
   
-  // Si no tiene guion, devolver el nombre original
-  return className;
+  return {
+    barcodesArray,
+    namesArray,
+    positionsArray,
+    nestedArray,
+    shelvesWithDistances
+  };
 }
 
 /**

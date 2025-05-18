@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Text, View, TextInput, TouchableOpacity, Alert, SafeAreaView, Image, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, query, collection, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc, query, collection, where, getDocs, getDoc, writeBatch } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import { globalStyles } from '../../styles/globalStyles';
 
@@ -63,14 +63,27 @@ export default function Signup({ navigation }) {
         createdAt: new Date().toISOString()
       };
 
-      // Guardar en la colección global de users
-      await setDoc(doc(db, 'users', uid), userData);
+      // Crear documentos en Firestore
+      const batch = writeBatch(db);
 
-      // Guardar en la subcolección users de la tienda
-      await setDoc(doc(db, 'tiendas', tiendaId, 'users', uid), userData);
+      // Documento en users
+      const userRef = doc(db, 'users', uid);
+      batch.set(userRef, userData);
 
-      // Registrar como empleado de la tienda
-      await setDoc(doc(db, 'tiendas', tiendaId, 'empleados', uid), {
+      // Documento en empleados
+      const empleadoRef = doc(db, 'empleados', uid);
+      batch.set(empleadoRef, {
+        ...userData,
+        tiendaId,
+        status: 'activo'
+      });
+
+      // Documentos en la tienda
+      const tiendaUserRef = doc(db, 'tiendas', tiendaId, 'users', uid);
+      batch.set(tiendaUserRef, userData);
+
+      const tiendaEmpleadoRef = doc(db, 'tiendas', tiendaId, 'empleados', uid);
+      batch.set(tiendaEmpleadoRef, {
         ...userData,
         tiendaId,
         permisos: {
@@ -80,18 +93,35 @@ export default function Signup({ navigation }) {
         }
       });
 
-      // Guardar en la colección de empleados global
-      await setDoc(doc(db, 'empleados', uid), {
-        ...userData,
-        tiendaId,
-        status: 'activo'
-      });
+      // Ejecutar todas las escrituras en una transacción
+      await batch.commit();
 
       // Navegar a MainApp
       navigation.replace('MainApp');
     } catch (error) {
       console.error('Error de registro:', error);
-      Alert.alert('Error', 'No se pudo registrar: ' + error.message);
+      let mensajeError = 'No se pudo registrar el usuario';
+      
+      if (error.code === 'auth/email-already-in-use') {
+        mensajeError = 'Este correo electrónico ya está registrado';
+      } else if (error.code === 'auth/invalid-email') {
+        mensajeError = 'El correo electrónico no es válido';
+      } else if (error.code === 'auth/weak-password') {
+        mensajeError = 'La contraseña es demasiado débil';
+      } else if (error.code === 'permission-denied') {
+        mensajeError = 'No tienes permisos para realizar esta acción';
+      }
+      
+      Alert.alert('Error', mensajeError);
+
+      // Si falló después de crear el usuario en Auth, intentar limpiarlo
+      if (auth.currentUser) {
+        try {
+          await auth.currentUser.delete();
+        } catch (deleteError) {
+          console.error('Error al limpiar usuario:', deleteError);
+        }
+      }
     }
   };
 

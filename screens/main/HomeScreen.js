@@ -5,24 +5,28 @@ import {
   SafeAreaView, 
   StyleSheet, 
   TouchableOpacity,
-  ScrollView,
   Image,
   ActivityIndicator,
   StatusBar,
-  FlatList,
-  RefreshControl 
+  FlatList
 } from 'react-native';
-import { doc, getDoc, query, collection, where, getDocs, orderBy, addDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { globalStyles, colors } from '../../styles/globalStyles';
+import { colors } from '../../styles/globalStyles';
 
 export default function HomeScreen({ navigation }) {
   const [userData, setUserData] = useState(null);
-  const [tiendaData, setTiendaData] = useState(null);
-  const [tasks, setTasks] = useState([]);
+  const [solicitudes, setSolicitudes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchData();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const fetchData = async () => {
     try {
@@ -48,23 +52,21 @@ export default function HomeScreen({ navigation }) {
 
         if (!querySnapshot.empty) {
           const tiendaDoc = querySnapshot.docs[0];
-          setTiendaData(tiendaDoc.data());
-
-          // Obtener todas las tareas y filtrar en el cliente
-          const tareasRef = collection(db, 'tiendas', tiendaDoc.id, 'tareas');
-          const tareasSnapshot = await getDocs(tareasRef);
           
-          const tareasData = tareasSnapshot.docs
+          // Obtener solicitudes activas
+          const solicitudesRef = collection(db, 'tiendas', tiendaDoc.id, 'solicitudes');
+          const solicitudesSnapshot = await getDocs(solicitudesRef);
+          
+          const solicitudesActivas = solicitudesSnapshot.docs
             .map(doc => ({
               id: doc.id,
               tiendaId: tiendaDoc.id,
               ...doc.data()
             }))
-            .filter(tarea => !tarea.completada) // Filtrar en el cliente
-            .sort((a, b) => new Date(a.fechaLimite) - new Date(b.fechaLimite)); // Ordenar por fecha
+            .filter(solicitud => !solicitud.completada)
+            .sort((a, b) => new Date(a.fechaLimite) - new Date(b.fechaLimite));
           
-          console.log('Tareas encontradas:', tareasData.length);
-          setTasks(tareasData);
+          setSolicitudes(solicitudesActivas);
         }
       } else {
         console.error('No se encontraron datos del usuario');
@@ -74,74 +76,52 @@ export default function HomeScreen({ navigation }) {
       console.error('Error al cargar datos:', error);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [navigation]);
-
-  const onRefresh = React.useCallback(() => {
-    setRefreshing(true);
-    fetchData();
-  }, []);
-
-  const renderTaskItem = ({ item }) => (
+  const renderSolicitudItem = ({ item }) => (
     <TouchableOpacity 
-      style={styles.taskCard}
+      style={styles.solicitudCard}
       onPress={() => navigation.navigate('TaskDetail', { 
-        taskId: item.id,
+        solicitudId: item.id,
         tiendaId: item.tiendaId 
       })}
     >
-      <View style={styles.taskHeader}>
-        <View style={styles.taskHeaderLeft}>
-          <Text style={styles.taskTitle}>{item.titulo}</Text>
-          <Text style={styles.taskDescription} numberOfLines={2}>
-            {item.descripcion}
-          </Text>
-        </View>
-        <View style={[styles.taskPriority, { backgroundColor: getPriorityColor(item.prioridad) }]}>
-          <Text style={styles.taskPriorityText}>{item.prioridad}</Text>
+      <View style={styles.cardHeader}>
+        <Text style={styles.titulo}>{item.titulo}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: colors.warning }]}>
+          <Text style={styles.statusText}>PENDIENTE</Text>
         </View>
       </View>
-      
-      <View style={styles.taskInfo}>
-        <View style={styles.taskInfoRow}>
+
+      <Text style={styles.descripcion} numberOfLines={2}>
+        {item.descripcion}
+      </Text>
+
+      <View style={styles.infoContainer}>
+        <View style={styles.infoRow}>
           <Icon name="event" size={16} color={colors.textLight} />
-          <Text style={styles.taskInfoText}>
+          <Text style={styles.infoText}>
             Límite: {new Date(item.fechaLimite).toLocaleDateString()}
           </Text>
         </View>
-        <View style={styles.taskInfoRow}>
+
+        <View style={styles.infoRow}>
           <Icon name="store" size={16} color={colors.textLight} />
-          <Text style={styles.taskInfoText}>
+          <Text style={styles.infoText}>
             Planograma: {item.planogramaNombre}
           </Text>
         </View>
-        <View style={styles.taskInfoRow}>
-          <Icon name="schedule" size={16} color={colors.textLight} />
-          <Text style={styles.taskInfoText}>
-            Turno: {item.turno}
+
+        <View style={styles.infoRow}>
+          <Icon name="person" size={16} color={colors.textLight} />
+          <Text style={styles.infoText}>
+            Creada por: {item.creadaPor}
           </Text>
         </View>
       </View>
     </TouchableOpacity>
   );
-
-  const getPriorityColor = (priority) => {
-    switch (priority?.toLowerCase()) {
-      case 'alta':
-        return '#FF4444';
-      case 'media':
-        return '#FFBB33';
-      case 'baja':
-        return '#00C851';
-      default:
-        return colors.primary;
-    }
-  };
 
   if (loading) {
     return (
@@ -168,21 +148,17 @@ export default function HomeScreen({ navigation }) {
         />
       </View>
 
-      <View style={styles.tasksContainer}>
-        <Text style={styles.sectionTitle}>Tareas Pendientes</Text>
+      <View style={styles.content}>
+        <Text style={styles.sectionTitle}>Solicitudes Pendientes</Text>
         <FlatList
-          data={tasks}
-          renderItem={renderTaskItem}
+          data={solicitudes}
+          renderItem={renderSolicitudItem}
           keyExtractor={item => item.id}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.tasksList}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
+          contentContainerStyle={styles.solicitudesList}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Icon name="assignment" size={64} color={colors.textLight} />
-              <Text style={styles.emptyText}>No hay tareas pendientes</Text>
+              <Text style={styles.emptyText}>No hay solicitudes pendientes</Text>
             </View>
           }
         />
@@ -230,7 +206,7 @@ const styles = StyleSheet.create({
     height: 120,
     transform: [{ rotate: '10deg' }],
   },
-  tasksContainer: {
+  content: {
     flex: 1,
     padding: 20,
   },
@@ -240,12 +216,12 @@ const styles = StyleSheet.create({
     color: colors.primary,
     marginBottom: 15,
   },
-  tasksList: {
+  solicitudesList: {
     paddingBottom: 20,
   },
-  taskCard: {
+  solicitudCard: {
     backgroundColor: colors.white,
-    borderRadius: 15,
+    borderRadius: 10,
     padding: 15,
     marginBottom: 15,
     elevation: 3,
@@ -256,49 +232,45 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primary,
   },
-  taskHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 10,
   },
-  taskHeaderLeft: {
-    flex: 1,
-    marginRight: 10,
-  },
-  taskTitle: {
+  titulo: {
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.text,
-    marginBottom: 5,
+    flex: 1,
+    marginRight: 10,
   },
-  taskDescription: {
-    fontSize: 14,
-    color: colors.textLight,
-    marginBottom: 10,
-  },
-  taskPriority: {
+  statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 15,
   },
-  taskPriorityText: {
+  statusText: {
     color: colors.white,
     fontSize: 12,
     fontWeight: 'bold',
-    textTransform: 'uppercase',
   },
-  taskInfo: {
+  descripcion: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginBottom: 10,
+  },
+  infoContainer: {
     borderTopWidth: 1,
     borderTopColor: '#eee',
     paddingTop: 10,
   },
-  taskInfoRow: {
+  infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 5,
   },
-  taskInfoText: {
+  infoText: {
     fontSize: 14,
     color: colors.textLight,
     marginLeft: 8,
@@ -307,10 +279,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 50,
   },
   emptyText: {
-    fontSize: 18,
+    fontSize: 16,
     color: colors.textLight,
-    marginTop: 20,
+    marginTop: 10,
   },
 });
