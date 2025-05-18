@@ -11,7 +11,8 @@ import {
   ActivityIndicator,
   Modal,
   Platform,
-  RefreshControl
+  RefreshControl,
+  FlatList
 } from 'react-native';
 import { doc, getDoc, collection, getDocs, updateDoc, query, orderBy, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -20,7 +21,9 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../../styles/globalStyles';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { Camera } from 'expo-camera';
+import { processImageAndCompare } from './messiComparator';
 
 export default function TaskDetailScreen({ route, navigation }) {
   const { taskId, tiendaId } = route.params;
@@ -32,6 +35,11 @@ export default function TaskDetailScreen({ route, navigation }) {
   const [hasPermission, setHasPermission] = useState(null);
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [showResultsModal, setShowResultsModal] = useState(false);
+  const [analysisResults, setAnalysisResults] = useState(null);
+  const [productosInfo, setProductosInfo] = useState({});
+  const [showDetectionModal, setShowDetectionModal] = useState(false);
+  const [detectionResults, setDetectionResults] = useState(null);
 
   useEffect(() => {
     loadTaskAndPlanograma();
@@ -248,12 +256,7 @@ export default function TaskDetailScreen({ route, navigation }) {
         throw new Error('No se puede acceder al archivo de imagen');
       }
 
-      // Verificar tamaño
-      if (fileInfo.size > 5 * 1024 * 1024) {
-        throw new Error('La imagen es demasiado grande. El tamaño máximo es 5MB.');
-      }
-
-      // Leer el archivo como base64
+      // Leer el archivo como base64 para Firebase
       const base64Data = await FileSystem.readAsStringAsync(imageUri, {
         encoding: FileSystem.EncodingType.Base64,
       });
@@ -294,6 +297,38 @@ export default function TaskDetailScreen({ route, navigation }) {
         const downloadURL = await getDownloadURL(uploadTask.ref);
         console.log('URL obtenida:', downloadURL);
 
+        // Procesar imagen con Roboflow API
+        console.log('Procesando imagen con Roboflow...');
+        let visionResults = null;
+        
+        if (planograma) {
+          // Convertir los datos del planograma al formato necesario para el comparador
+          const planogramaData = convertirPlanogramaParaComparador(planograma.niveles);
+          console.log('Planograma formateado:', planogramaData);
+          
+          // Procesar con la API de Roboflow y comparar con el planograma
+          // Ahora usamos la URL de Firebase Storage en lugar de la imagen base64
+          visionResults = await processImageAndCompare(downloadURL, planogramaData, { useUrl: true });
+          console.log('Resultados de Vision API:', visionResults);
+          
+          if (visionResults && visionResults.barcodesArray) {
+            // Guardar resultados de detección para mostrar modal
+            setDetectionResults(visionResults.barcodesArray);
+            
+            // Mostrar modal de detecciones primero
+            setShowDetectionModal(true);
+            
+            // Si hay discrepancias, cargar información de productos 
+            // (pero no mostrar el modal todavía, se mostrará después)
+            if (visionResults?.comparacion?.movimientos?.length > 0) {
+              setAnalysisResults(visionResults.comparacion);
+              await cargarInfoProductos(visionResults.comparacion.movimientos);
+            }
+          }
+        } else {
+          console.log('No hay planograma disponible para comparar');
+        }
+
         // Crear nueva entrada en la colección de evidencias
         const evidenciasRef = collection(db, 'tiendas', tiendaId, 'tareas', taskId, 'evidencias');
         const currentDate = new Date();
@@ -313,6 +348,16 @@ export default function TaskDetailScreen({ route, navigation }) {
             resolucion: type === 'photo' ? 'original' : 'N/A'
           }
         };
+
+        // Agregar resultados del análisis de visión si están disponibles
+        if (visionResults) {
+          evidenciaData.visionResults = {
+            barcodesArray: visionResults.barcodesArray,
+            discrepancias: visionResults.comparacion.discrepancias,
+            movimientos: visionResults.comparacion.movimientos,
+            timestamp: new Date().toISOString()
+          };
+        }
 
         console.log('Guardando en Firestore:', evidenciaData);
         await addDoc(evidenciasRef, evidenciaData);
@@ -343,9 +388,7 @@ export default function TaskDetailScreen({ route, navigation }) {
       console.error('Error completo:', error);
       let errorMessage = 'No se pudo subir la evidencia.';
       
-      if (error.message.includes('demasiado grande')) {
-        errorMessage = error.message;
-      } else if (error.code === 'storage/unauthorized') {
+      if (error.code === 'storage/unauthorized') {
         errorMessage = 'No tienes permisos para subir archivos.';
       } else if (error.code === 'storage/canceled') {
         errorMessage = 'La subida fue cancelada.';
@@ -405,6 +448,195 @@ export default function TaskDetailScreen({ route, navigation }) {
       console.error('Error al seleccionar imagen:', error);
       Alert.alert('Error', 'No se pudo seleccionar la imagen');
     }
+  };
+
+  /**
+   * Carga la información de los productos mencionados en los movimientos
+   * @param {Array} movimientos - Lista de movimientos recomendados
+   */
+  const cargarInfoProductos = async (movimientos) => {
+    try {
+      const productosIds = new Set();
+      
+      // Extraer todos los IDs de productos únicos
+      movimientos.forEach(mov => {
+        if (mov.producto && mov.producto !== 'EMPTY' && mov.producto !== 'vacío') {
+          productosIds.add(mov.producto);
+        }
+      });
+      
+      const infoProductos = {};
+      
+      // Consultar información de cada producto
+      for (const id of productosIds) {
+        try {
+          const productoDoc = await getDoc(doc(db, 'productos', id));
+          if (productoDoc.exists()) {
+            infoProductos[id] = productoDoc.data();
+          } else {
+            infoProductos[id] = { nombre: `Producto ${id}`, id: id };
+          }
+        } catch (err) {
+          console.error(`Error al obtener información del producto ${id}:`, err);
+          infoProductos[id] = { nombre: `Producto ${id}`, id: id };
+        }
+      }
+      
+      setProductosInfo(infoProductos);
+    } catch (error) {
+      console.error('Error cargando información de productos:', error);
+    }
+  };
+  
+  /**
+   * Renderiza un mensaje descriptivo para un movimiento recomendado
+   * @param {Object} movimiento - El movimiento a describir
+   * @returns {String} - Mensaje descriptivo
+   */
+  const getMovimientoDescripcion = (movimiento) => {
+    const { tipo, producto, origen, destino } = movimiento;
+    const productoInfo = productosInfo[producto] || { nombre: `Producto ${producto}` };
+    
+    switch (tipo) {
+      case 'mover':
+        return `El producto "${productoInfo.nombre}" no va en la posición ${origen.fila + 1}-${origen.columna + 1}. Debe moverse a la posición ${destino.fila + 1}-${destino.columna + 1}.`;
+      case 'remover':
+        return `El producto "${productoInfo.nombre}" debe ser removido de la posición ${origen.fila + 1}-${origen.columna + 1}, no pertenece al planograma.`;
+      case 'añadir':
+        return `Falta el producto "${productoInfo.nombre}" en la posición ${destino.fila + 1}-${destino.columna + 1}.`;
+      default:
+        return `Acción requerida para "${productoInfo.nombre}"`;
+    }
+  };
+
+  // Renderizar el modal de detecciones por charola
+  const renderDetectionModal = () => {
+    if (!detectionResults) return null;
+    
+    return (
+      <Modal
+        visible={showDetectionModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowDetectionModal(false);
+          // Si hay discrepancias, mostrar el modal de discrepancias después
+          if (analysisResults?.movimientos?.length > 0) {
+            setShowResultsModal(true);
+          }
+        }}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.detectionModalContent}>
+            <Text style={styles.detectionModalTitle}>Productos Detectados</Text>
+            
+            {detectionResults.length === 0 ? (
+              <View style={styles.noDetectionsContainer}>
+                <Icon name="error-outline" size={48} color={colors.textLight} />
+                <Text style={styles.noDetectionsText}>
+                  No se detectaron productos en la imagen
+                </Text>
+              </View>
+            ) : (
+              <ScrollView style={styles.detectionScrollView}>
+                {detectionResults.map((charolaProductos, index) => (
+                  <View key={`charola-${index}`} style={styles.charolaContainer}>
+                    <View style={styles.charolaHeader}>
+                      <Text style={styles.charolaTitle}>
+                        Charola {detectionResults.length - index}
+                      </Text>
+                    </View>
+                    
+                    <ScrollView horizontal style={styles.productosScroll}>
+                      {charolaProductos.map((producto, prodIndex) => (
+                        <View key={`producto-${index}-${prodIndex}`} style={styles.productoDetectado}>
+                          <View style={styles.productoDetectadoItem}>
+                            <Text style={[
+                              styles.productoDetectadoText,
+                              producto === 'EMPTY' && styles.productoVacio
+                            ]}>
+                              {producto === 'EMPTY' ? 'Vacío' : producto}
+                            </Text>
+                          </View>
+                          <Text style={styles.productoDetectadoPosicion}>
+                            Posición {prodIndex + 1}
+                          </Text>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+            
+            <TouchableOpacity 
+              style={styles.detectionCloseButton}
+              onPress={() => {
+                setShowDetectionModal(false);
+                // Si hay discrepancias, mostrar el modal de discrepancias después
+                if (analysisResults?.movimientos?.length > 0) {
+                  setShowResultsModal(true);
+                }
+              }}
+            >
+              <Text style={styles.detectionCloseButtonText}>
+                {analysisResults?.movimientos?.length > 0 ? 
+                  'Ver Recomendaciones' : 'Continuar'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
+  // Renderizar el modal de resultados
+  const renderResultsModal = () => {
+    if (!analysisResults || !analysisResults.movimientos) return null;
+    
+    return (
+      <Modal
+        visible={showResultsModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowResultsModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.resultsModalContent}>
+            <Text style={styles.resultsModalTitle}>Discrepancias Detectadas</Text>
+            
+            <Text style={styles.resultsModalSubtitle}>
+              {analysisResults.movimientos.length} {analysisResults.movimientos.length === 1 ? 'cambio' : 'cambios'} requerido{analysisResults.movimientos.length !== 1 ? 's' : ''}:
+            </Text>
+            
+            <FlatList
+              data={analysisResults.movimientos}
+              keyExtractor={(item, index) => `movimiento-${index}`}
+              style={styles.resultsList}
+              renderItem={({ item, index }) => (
+                <View style={styles.resultItem}>
+                  <View style={styles.resultItemNumContainer}>
+                    <Text style={styles.resultItemNum}>{index + 1}</Text>
+                  </View>
+                  <View style={styles.resultItemContent}>
+                    <Text style={styles.resultItemText}>
+                      {getMovimientoDescripcion(item)}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            />
+            
+            <TouchableOpacity 
+              style={styles.resultsCloseButton}
+              onPress={() => setShowResultsModal(false)}
+            >
+              <Text style={styles.resultsCloseButtonText}>Entendido</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
   };
 
   if (loading) {
@@ -484,6 +716,9 @@ export default function TaskDetailScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
       )}
+
+      {renderDetectionModal()}
+      {renderResultsModal()}
 
       <Modal
         visible={showImageOptions}
@@ -857,4 +1092,189 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: colors.text,
   },
-}); 
+  resultsModalContent: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  resultsModalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: colors.primary,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  resultsModalSubtitle: {
+    fontSize: 16,
+    color: colors.text,
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  resultsList: {
+    maxHeight: 400,
+  },
+  resultItem: {
+    flexDirection: 'row',
+    padding: 10,
+    marginBottom: 10,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  resultItemNumContainer: {
+    backgroundColor: colors.primary,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  resultItemNum: {
+    color: colors.white,
+    fontWeight: 'bold',
+  },
+  resultItemContent: {
+    flex: 1,
+  },
+  resultItemText: {
+    fontSize: 15,
+    color: colors.text,
+    lineHeight: 22,
+  },
+  resultsCloseButton: {
+    backgroundColor: colors.primary,
+    padding: 15,
+    borderRadius: 10,
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  resultsCloseButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  detectionModalContent: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  detectionModalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: colors.primary,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  detectionScrollView: {
+    maxHeight: 450,
+  },
+  charolaContainer: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    marginBottom: 15,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+  },
+  charolaHeader: {
+    backgroundColor: colors.primary,
+    padding: 10,
+  },
+  charolaTitle: {
+    color: colors.white,
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  productosScroll: {
+    paddingVertical: 10,
+    paddingHorizontal: 5,
+    minHeight: 100,
+  },
+  productoDetectado: {
+    width: 100,
+    margin: 5,
+    alignItems: 'center',
+  },
+  productoDetectadoItem: {
+    width: 90,
+    height: 90,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 5,
+  },
+  productoDetectadoText: {
+    fontWeight: 'bold',
+    textAlign: 'center',
+    fontSize: 13,
+  },
+  productoVacio: {
+    color: colors.textLight,
+    fontStyle: 'italic',
+  },
+  productoDetectadoPosicion: {
+    fontSize: 11,
+    color: colors.textLight,
+    marginTop: 5,
+  },
+  noDetectionsContainer: {
+    padding: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noDetectionsText: {
+    textAlign: 'center',
+    color: colors.textLight,
+    marginTop: 15,
+    fontSize: 16,
+  },
+  detectionCloseButton: {
+    backgroundColor: colors.primary,
+    padding: 15,
+    borderRadius: 10,
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  detectionCloseButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+});
+
+/**
+ * Convierte el formato del planograma para que sea compatible con el comparador
+ * 
+ * @param {Array} niveles - Niveles del planograma
+ * @returns {Array<Array<string>>} - Planograma formateado para el comparador
+ */
+const convertirPlanogramaParaComparador = (niveles) => {
+  if (!niveles || !niveles.length) return [];
+  
+  // Invertimos los niveles porque en el comparador se procesan de abajo hacia arriba
+  const nivelesInvertidos = [...niveles].reverse();
+  
+  return nivelesInvertidos.map(nivel => {
+    const productos = nivel.productos || {};
+    const productosArray = [];
+    
+    // Convertir el objeto de productos a un array ordenado
+    Object.keys(productos)
+      .sort((a, b) => parseInt(a) - parseInt(b))
+      .forEach(posicion => {
+        const producto = productos[posicion];
+        productosArray.push(producto.id || '');
+      });
+    
+    return productosArray;
+  });
+}; 
