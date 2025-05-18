@@ -50,13 +50,9 @@ export default function HomeScreen({ navigation }) {
           const tiendaDoc = querySnapshot.docs[0];
           setTiendaData(tiendaDoc.data());
 
-          // Obtener tareas no completadas
+          // Obtener todas las tareas y filtrar en el cliente
           const tareasRef = collection(db, 'tiendas', tiendaDoc.id, 'tareas');
-          const tareasQuery = query(
-            tareasRef,
-            where('completada', '==', false)
-          );
-          const tareasSnapshot = await getDocs(tareasQuery);
+          const tareasSnapshot = await getDocs(tareasRef);
           
           const tareasData = tareasSnapshot.docs
             .map(doc => ({
@@ -64,8 +60,10 @@ export default function HomeScreen({ navigation }) {
               tiendaId: tiendaDoc.id,
               ...doc.data()
             }))
-            .sort((a, b) => new Date(a.fechaLimite) - new Date(b.fechaLimite));
+            .filter(tarea => !tarea.completada) // Filtrar en el cliente
+            .sort((a, b) => new Date(a.fechaLimite) - new Date(b.fechaLimite)); // Ordenar por fecha
           
+          console.log('Tareas encontradas:', tareasData.length);
           setTasks(tareasData);
         }
       } else {

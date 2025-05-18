@@ -9,7 +9,7 @@ import {
   FlatList,
   ActivityIndicator
 } from 'react-native';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../../styles/globalStyles';
@@ -47,19 +47,25 @@ export default function TaskManagerScreen({ navigation }) {
           const tiendaDoc = tiendaSnapshot.docs[0];
           const tareasRef = collection(db, 'tiendas', tiendaDoc.id, 'tareas');
           
-          // Consulta según la pestaña activa
-          const tareasQuery = query(
-            tareasRef,
-            where('completada', '==', activeTab === 'completadas')
-          );
-          
-          const tareasSnapshot = await getDocs(tareasQuery);
-          const tareasData = tareasSnapshot.docs.map(doc => ({
+          // Obtener todas las tareas y filtrar en el cliente
+          const tareasSnapshot = await getDocs(tareasRef);
+          const todasLasTareas = tareasSnapshot.docs.map(doc => ({
             id: doc.id,
             tiendaId: tiendaDoc.id,
             ...doc.data()
           }));
+
+          // Filtrar y ordenar en el cliente según la pestaña activa
+          const tareasData = todasLasTareas
+            .filter(tarea => activeTab === 'completadas' ? tarea.completada : !tarea.completada)
+            .sort((a, b) => {
+              if (activeTab === 'completadas') {
+                return new Date(b.fechaCompletado || 0) - new Date(a.fechaCompletado || 0);
+              }
+              return new Date(a.fechaLimite) - new Date(b.fechaLimite);
+            });
           
+          console.log(`Tareas ${activeTab}:`, tareasData.length);
           setTasks(tareasData);
         }
       }
