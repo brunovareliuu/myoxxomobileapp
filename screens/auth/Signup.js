@@ -52,8 +52,14 @@ export default function Signup({ navigation }) {
         nombre,
         codigoTienda: codigoTiendaLimpio,
         tiendaNombre: tiendaData.nombre,
-        rol: 'app_user',
+        rol: 'empleado',
         uid,
+        activo: true,
+        permisos: {
+          lectura: true,
+          escritura: true,
+          acceso_tienda: true
+        },
         createdAt: new Date().toISOString()
       };
 
@@ -62,6 +68,24 @@ export default function Signup({ navigation }) {
 
       // Guardar en la subcolección users de la tienda
       await setDoc(doc(db, 'tiendas', tiendaId, 'users', uid), userData);
+
+      // Registrar como empleado de la tienda
+      await setDoc(doc(db, 'tiendas', tiendaId, 'empleados', uid), {
+        ...userData,
+        tiendaId,
+        permisos: {
+          ...userData.permisos,
+          acceso_inventario: true,
+          acceso_tareas: true
+        }
+      });
+
+      // Guardar en la colección de empleados global
+      await setDoc(doc(db, 'empleados', uid), {
+        ...userData,
+        tiendaId,
+        status: 'activo'
+      });
 
       // Navegar a MainApp
       navigation.replace('MainApp');

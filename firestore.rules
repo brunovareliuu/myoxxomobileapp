@@ -1,0 +1,82 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ========= Funciones auxiliares generales =========
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+
+    function hasBasicPermissions() {
+      return isAuth() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permisos.lectura == true;
+    }
+
+    function isActiveEmployee() {
+      return isAuth() &&
+        exists(/databases/$(database)/documents/empleados/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/empleados/$(request.auth.uid)).data.status == 'activo';
+    }
+
+    function isStoreEmployee(tiendaId) {
+      return isAuth() &&
+        exists(/databases/$(database)/documents/tiendas/$(tiendaId)/empleados/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/tiendas/$(tiendaId)/empleados/$(request.auth.uid)).data.activo == true;
+    }
+
+    function hasStoreAccess(tiendaId) {
+      return isAuth() &&
+        exists(/databases/$(database)/documents/tiendas/$(tiendaId)/empleados/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/tiendas/$(tiendaId)/empleados/$(request.auth.uid)).data.permisos.acceso_tienda == true;
+    }
+
+    // ========= Reglas de colecciones =========
+
+    // Reglas para la colección users
+    match /users/{userId} {
+      allow read: if isOwner(userId) || hasBasicPermissions();
+      allow create: if isAuth() && request.auth.uid == userId;
+      allow update: if isOwner(userId);
+      allow delete: if false;
+    }
+
+    // Reglas para la colección empleados
+    match /empleados/{empleadoId} {
+      allow read: if isAuth() && (isOwner(empleadoId) || hasBasicPermissions());
+      allow write: if isAuth() && isOwner(empleadoId);
+    }
+
+    // Reglas para las tiendas
+    match /tiendas/{tiendaId} {
+      allow read: if hasBasicPermissions() && hasStoreAccess(tiendaId);
+      
+      match /empleados/{empleadoId} {
+        allow read: if isOwner(empleadoId) || hasStoreAccess(tiendaId);
+        allow write: if isOwner(empleadoId) && isActiveEmployee();
+      }
+
+      match /tareas/{tareaId} {
+        allow read: if hasStoreAccess(tiendaId) && 
+          get(/databases/$(database)/documents/tiendas/$(tiendaId)/empleados/$(request.auth.uid)).data.permisos.acceso_tareas == true;
+        allow write: if hasStoreAccess(tiendaId) && 
+          get(/databases/$(database)/documents/tiendas/$(tiendaId)/empleados/$(request.auth.uid)).data.permisos.acceso_tareas == true;
+      }
+
+      match /inventario/{docId} {
+        allow read, write: if hasStoreAccess(tiendaId) && 
+          get(/databases/$(database)/documents/tiendas/$(tiendaId)/empleados/$(request.auth.uid)).data.permisos.acceso_inventario == true;
+      }
+    }
+
+    // Regla catch-all para denegar acceso por defecto
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+} 
