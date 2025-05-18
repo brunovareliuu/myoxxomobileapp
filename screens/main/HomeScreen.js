@@ -11,7 +11,7 @@ import {
   StatusBar,
   FlatList 
 } from 'react-native';
-import { doc, getDoc, query, collection, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, query, collection, where, getDocs, orderBy, addDoc } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { globalStyles, colors } from '../../styles/globalStyles';
@@ -49,16 +49,20 @@ export default function HomeScreen({ navigation }) {
             const tiendaDoc = querySnapshot.docs[0];
             setTiendaData(tiendaDoc.data());
 
-            // Obtener tasks para esta tienda
-            const tasksRef = collection(db, 'tiendas', tiendaDoc.id, 'tasks');
-            const tasksQuery = query(tasksRef, where('status', '==', 'pending'));
-            const tasksSnapshot = await getDocs(tasksQuery);
+            // Obtener todas las tareas y filtrar en el cliente
+            const tareasRef = collection(db, 'tiendas', tiendaDoc.id, 'tareas');
+            const tareasSnapshot = await getDocs(tareasRef);
             
-            const tasksData = tasksSnapshot.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data()
-            }));
-            setTasks(tasksData);
+            const tareasData = tareasSnapshot.docs
+              .map(doc => ({
+                id: doc.id,
+                tiendaId: tiendaDoc.id,
+                ...doc.data()
+              }))
+              .filter(tarea => tarea.activa) // Filtrar tareas activas en el cliente
+              .sort((a, b) => new Date(a.fechaLimite) - new Date(b.fechaLimite)); // Ordenar por fecha
+            
+            setTasks(tareasData);
           }
         } else {
           console.error('No se encontraron datos del usuario');
@@ -66,7 +70,6 @@ export default function HomeScreen({ navigation }) {
         }
       } catch (error) {
         console.error('Error al cargar datos:', error);
-        navigation.replace('Login');
       } finally {
         setLoading(false);
       }
@@ -78,30 +81,58 @@ export default function HomeScreen({ navigation }) {
   const renderTaskItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.taskCard}
-      onPress={() => navigation.navigate('TaskDetail', { taskId: item.id })}
+      onPress={() => navigation.navigate('TaskDetail', { 
+        taskId: item.id,
+        tiendaId: item.tiendaId 
+      })}
     >
       <View style={styles.taskHeader}>
-        <Icon 
-          name={item.completed ? "check-circle" : "schedule"} 
-          size={24} 
-          color={item.completed ? colors.secondary : colors.primary} 
-        />
-        <Text style={styles.taskTitle}>{item.title}</Text>
+        <View style={styles.taskHeaderLeft}>
+          <Text style={styles.taskTitle}>{item.titulo}</Text>
+          <Text style={styles.taskDescription} numberOfLines={2}>
+            {item.descripcion}
+          </Text>
+        </View>
+        <View style={[styles.taskPriority, { backgroundColor: getPriorityColor(item.prioridad) }]}>
+          <Text style={styles.taskPriorityText}>{item.prioridad}</Text>
+        </View>
       </View>
+      
       <View style={styles.taskInfo}>
-        <Text style={styles.taskTurno}>Turno: {item.turno}</Text>
-        <Text style={styles.taskTime}>Tiempo estimado: {item.estimatedTime}</Text>
-      </View>
-      <View style={styles.taskStatus}>
-        <Text style={[
-          styles.taskStatusText,
-          { color: item.completed ? colors.secondary : colors.primary }
-        ]}>
-          {item.completed ? 'Completada' : 'Pendiente'}
-        </Text>
+        <View style={styles.taskInfoRow}>
+          <Icon name="event" size={16} color={colors.textLight} />
+          <Text style={styles.taskInfoText}>
+            Límite: {new Date(item.fechaLimite).toLocaleDateString()}
+          </Text>
+        </View>
+        <View style={styles.taskInfoRow}>
+          <Icon name="store" size={16} color={colors.textLight} />
+          <Text style={styles.taskInfoText}>
+            Planograma: {item.planogramaNombre}
+          </Text>
+        </View>
+        <View style={styles.taskInfoRow}>
+          <Icon name="schedule" size={16} color={colors.textLight} />
+          <Text style={styles.taskInfoText}>
+            Turno: {item.turno}
+          </Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
+
+  const getPriorityColor = (priority) => {
+    switch (priority?.toLowerCase()) {
+      case 'alta':
+        return '#FF4444';
+      case 'media':
+        return '#FFBB33';
+      case 'baja':
+        return '#00C851';
+      default:
+        return colors.primary;
+    }
+  };
 
   if (loading) {
     return (
@@ -199,46 +230,59 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     padding: 15,
     marginBottom: 15,
-    borderWidth: 1,
-    borderColor: colors.primary,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.primary,
   },
   taskHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 10,
+  },
+  taskHeaderLeft: {
+    flex: 1,
+    marginRight: 10,
   },
   taskTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.primary,
-    marginLeft: 10,
-  },
-  taskInfo: {
-    marginBottom: 10,
-  },
-  taskTurno: {
-    fontSize: 16,
-    color: colors.textLight,
+    color: colors.text,
     marginBottom: 5,
   },
-  taskTime: {
+  taskDescription: {
     fontSize: 14,
     color: colors.textLight,
+    marginBottom: 10,
   },
-  taskStatus: {
-    borderTopWidth: 1,
-    borderTopColor: colors.primary,
-    paddingTop: 10,
-    marginTop: 10,
+  taskPriority: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 15,
   },
-  taskStatusText: {
-    fontSize: 14,
+  taskPriorityText: {
+    color: colors.white,
+    fontSize: 12,
     fontWeight: 'bold',
-    textAlign: 'right',
+    textTransform: 'uppercase',
+  },
+  taskInfo: {
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 10,
+  },
+  taskInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  taskInfoText: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginLeft: 8,
   },
 });

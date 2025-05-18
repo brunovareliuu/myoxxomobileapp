@@ -67,11 +67,18 @@ export default function SearchScreen() {
       const planogramasData = await Promise.all(planogramasSnapshot.docs.map(async (doc) => {
         const nivelesRef = collection(doc.ref, 'niveles');
         const nivelesSnapshot = await getDocs(nivelesRef);
-        const niveles = nivelesSnapshot.docs.map(nivelDoc => ({
-          id: nivelDoc.id,
-          ...nivelDoc.data(),
-          productos: nivelDoc.data().productos || {}
-        }));
+        const niveles = nivelesSnapshot.docs
+          .map(nivelDoc => ({
+            id: nivelDoc.id,
+            ...nivelDoc.data(),
+            productos: nivelDoc.data().productos || {}
+          }))
+          .sort((a, b) => {
+            // Extraer el número del ID (asumiendo formato nivel_X)
+            const numA = parseInt(a.id.split('_')[1]);
+            const numB = parseInt(b.id.split('_')[1]);
+            return numB - numA; // Ordenar de mayor a menor
+          });
 
         return {
           id: doc.id,
@@ -289,7 +296,7 @@ export default function SearchScreen() {
       <View style={styles.cardContent}>
         <Text style={styles.productName}>{item.nombre}</Text>
         <Text style={styles.productInfo}>Planograma: {item.planograma}</Text>
-        <Text style={styles.productInfo}>Charola #{item.nivel}</Text>
+        <Text style={styles.productInfo}>Charola #{parseInt(item.nivel) + 1}</Text>
         <Text style={styles.productInfo}>Ubicación: {item.gridPosition}</Text>
         <Text style={styles.productId}>ID: {item.id}</Text>
       </View>
@@ -382,40 +389,44 @@ export default function SearchScreen() {
       <View style={styles.planogramaVisualContainer}>
         <Text style={styles.visualTitle}>Planograma: {selectedPlanograma.nombre}</Text>
         <ScrollView horizontal={false} style={styles.planogramaScroll}>
-          {selectedPlanograma.niveles.map((nivel, index) => (
-            <View key={nivel.id} style={styles.nivelRow}>
-              <View style={styles.nivelHeader}>
-                <Text style={styles.nivelLabel}>Charola {nivel.id.split('_')[1]}</Text>
+          {selectedPlanograma.niveles.map((nivel, index) => {
+            // Extraer el número del ID y asegurarnos que empiece en 1
+            const nivelNum = parseInt(nivel.id.split('_')[1]) + 1;
+            return (
+              <View key={nivel.id} style={styles.nivelRow}>
+                <View style={styles.nivelHeader}>
+                  <Text style={styles.nivelLabel}>Charola {nivelNum}</Text>
+                </View>
+                <ScrollView horizontal style={styles.productosRow}>
+                  {Object.entries(nivel.productos || {}).map(([index, producto]) => (
+                    <TouchableOpacity 
+                      key={`${producto.id}-${index}`}
+                      style={styles.productoVisual}
+                      onPress={() => {
+                        setSelectedNivel(nivel);
+                        setProductoSeleccionado(producto);
+                      }}
+                    >
+                      {producto.imagenUrl ? (
+                        <Image 
+                          source={{ uri: producto.imagenUrl }} 
+                          style={styles.productoImagen}
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <View style={styles.productoPlaceholder}>
+                          <Icon name="image" size={24} color={colors.textLight} />
+                        </View>
+                      )}
+                      <Text style={styles.productoNombre} numberOfLines={2}>
+                        {producto.nombre}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
-              <ScrollView horizontal style={styles.productosRow}>
-                {Object.entries(nivel.productos || {}).map(([index, producto]) => (
-                  <TouchableOpacity 
-                    key={`${producto.id}-${index}`}
-                    style={styles.productoVisual}
-                    onPress={() => {
-                      setSelectedNivel(nivel);
-                      setProductoSeleccionado(producto);
-                    }}
-                  >
-                    {producto.imagenUrl ? (
-                      <Image 
-                        source={{ uri: producto.imagenUrl }} 
-                        style={styles.productoImagen}
-                        resizeMode="contain"
-                      />
-                    ) : (
-                      <View style={styles.productoPlaceholder}>
-                        <Icon name="image" size={24} color={colors.textLight} />
-                      </View>
-                    )}
-                    <Text style={styles.productoNombre} numberOfLines={2}>
-                      {producto.nombre}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          ))}
+            );
+          })}
         </ScrollView>
         {productoSeleccionado && (
           <View style={styles.modalOverlay}>
