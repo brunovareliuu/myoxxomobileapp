@@ -77,7 +77,7 @@ export default function SearchScreen() {
             // Extraer el número del ID (asumiendo formato nivel_X)
             const numA = parseInt(a.id.split('_')[1]);
             const numB = parseInt(b.id.split('_')[1]);
-            return numB - numA; // Ordenar de mayor a menor
+            return numA - numB; // Ordenar de menor a mayor para que nivel_0 esté arriba
           });
 
         return {
@@ -227,19 +227,21 @@ export default function SearchScreen() {
         const planogramaData = planogramaDoc.data();
         const nivelesRef = collection(planogramaDoc.ref, 'niveles');
         const nivelesSnapshot = await getDocs(nivelesRef);
+        const totalNiveles = nivelesSnapshot.size;
 
         for (const nivelDoc of nivelesSnapshot.docs) {
           const nivelData = nivelDoc.data();
           const productos = nivelData.productos || {};
+          const nivelNum = parseInt(nivelDoc.id.split('_')[1]);
+          const charolaNum = totalNiveles - nivelNum;
 
           for (const [index, producto] of Object.entries(productos)) {
             if (producto.nombre.toLowerCase().includes(searchQuery.toLowerCase())) {
-              const nivelNum = parseInt(nivelDoc.id.split('_')[1]) + 1;
               const posicion = parseInt(index) + 1;
               foundProducts.push({
                 nombre: producto.nombre,
                 planograma: planogramaData.nombre,
-                nivel: nivelNum,
+                nivel: charolaNum,
                 id: producto.id,
                 imagen: producto.imagenUrl || null,
                 gridPosition: posicion.toString(),
@@ -298,7 +300,7 @@ export default function SearchScreen() {
       <View style={styles.cardContent}>
         <Text style={styles.productName}>{item.nombre}</Text>
         <Text style={styles.productInfo}>Planograma: {item.planograma}</Text>
-        <Text style={styles.productInfo}>Charola #{parseInt(item.nivel) + 1}</Text>
+        <Text style={styles.productInfo}>Charola {item.nivel}</Text>
         <Text style={styles.productInfo}>Ubicación: {item.gridPosition}</Text>
         <Text style={styles.productId}>ID: {item.id}</Text>
       </View>
@@ -337,52 +339,58 @@ export default function SearchScreen() {
     </TouchableOpacity>
   );
 
-  const renderProductoDetalle = (producto) => (
-    <View style={styles.productoDetalleContainer}>
-      <View style={styles.productoDetalleHeader}>
-        <TouchableOpacity 
-          style={styles.closeButton}
-          onPress={() => setProductoSeleccionado(null)}
-        >
-          <Icon name="close" size={24} color={colors.text} />
-        </TouchableOpacity>
-      </View>
-      <View style={styles.productoDetalleContentHorizontal}>
-        <View style={styles.productoDetalleImageContainer}>
-          {producto.imagenUrl ? (
-            <Image 
-              source={{ uri: producto.imagenUrl }} 
-              style={styles.productoDetalleImagen}
-              resizeMode="contain"
-            />
-          ) : (
-            <View style={styles.productoDetallePlaceholder}>
-              <Icon name="image" size={48} color={colors.textLight} />
+  const renderProductoDetalle = (producto) => {
+    const nivelNum = parseInt(selectedNivel?.id.split('_')[1] || 0);
+    const totalNiveles = selectedPlanograma?.niveles?.length || 0;
+    const charolaNum = totalNiveles - nivelNum;
+
+    return (
+      <View style={styles.productoDetalleContainer}>
+        <View style={styles.productoDetalleHeader}>
+          <TouchableOpacity 
+            style={styles.closeButton}
+            onPress={() => setProductoSeleccionado(null)}
+          >
+            <Icon name="close" size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.productoDetalleContentHorizontal}>
+          <View style={styles.productoDetalleImageContainer}>
+            {producto.imagenUrl ? (
+              <Image 
+                source={{ uri: producto.imagenUrl }} 
+                style={styles.productoDetalleImagen}
+                resizeMode="contain"
+              />
+            ) : (
+              <View style={styles.productoDetallePlaceholder}>
+                <Icon name="image" size={48} color={colors.textLight} />
+              </View>
+            )}
+          </View>
+          <View style={styles.productoDetalleInfo}>
+            <Text style={styles.productoDetalleTitulo}>{producto.nombre}</Text>
+            <View style={styles.productoDetalleData}>
+              <Text style={styles.productoDetalleLabel}>Planograma: </Text>
+              <Text style={styles.productoDetalleTexto}>{selectedPlanograma.nombre}</Text>
             </View>
-          )}
-        </View>
-        <View style={styles.productoDetalleInfo}>
-          <Text style={styles.productoDetalleTitulo}>{producto.nombre}</Text>
-          <View style={styles.productoDetalleData}>
-            <Text style={styles.productoDetalleLabel}>Planograma: </Text>
-            <Text style={styles.productoDetalleTexto}>{selectedPlanograma.nombre}</Text>
-          </View>
-          <View style={styles.productoDetalleData}>
-            <Text style={styles.productoDetalleLabel}>Charola: </Text>
-            <Text style={styles.productoDetalleTexto}>#{selectedNivel.id.split('_')[1]}</Text>
-          </View>
-          <View style={styles.productoDetalleData}>
-            <Text style={styles.productoDetalleLabel}>Ubicación:</Text>
-            <Text style={styles.productoDetalleTexto}>{producto.gridPosition}</Text>
-          </View>
-          <View style={styles.productoDetalleData}>
-            <Text style={styles.productoDetalleLabel}>ID:</Text>
-            <Text style={styles.productoDetalleTexto}>{producto.id}</Text>
+            <View style={styles.productoDetalleData}>
+              <Text style={styles.productoDetalleLabel}>Charola: </Text>
+              <Text style={styles.productoDetalleTexto}>{charolaNum}</Text>
+            </View>
+            <View style={styles.productoDetalleData}>
+              <Text style={styles.productoDetalleLabel}>Ubicación:</Text>
+              <Text style={styles.productoDetalleTexto}>{producto.gridPosition}</Text>
+            </View>
+            <View style={styles.productoDetalleData}>
+              <Text style={styles.productoDetalleLabel}>ID:</Text>
+              <Text style={styles.productoDetalleTexto}>{producto.id}</Text>
+            </View>
           </View>
         </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderPlanogramaVisual = () => {
     if (!selectedPlanograma) return null;
@@ -392,11 +400,13 @@ export default function SearchScreen() {
         <Text style={styles.visualTitle}>Planograma: {selectedPlanograma.nombre}</Text>
         <ScrollView horizontal={false} style={styles.planogramaScroll}>
           {selectedPlanograma.niveles.map((nivel) => {
-            const nivelNum = parseInt(nivel.id.split('_')[1]) + 1;
+            const nivelNum = parseInt(nivel.id.split('_')[1]);
+            const totalNiveles = selectedPlanograma.niveles.length;
+            const charolaNum = totalNiveles - nivelNum;
             return (
               <View key={nivel.id} style={styles.nivelRow}>
                 <View style={styles.nivelHeader}>
-                  <Text style={styles.nivelLabel}>Charola {nivelNum}</Text>
+                  <Text style={styles.nivelLabel}>Charola {charolaNum}</Text>
                 </View>
                 <ScrollView horizontal style={styles.productosRow}>
                   {Object.entries(nivel.productos || {}).map(([index, producto]) => {

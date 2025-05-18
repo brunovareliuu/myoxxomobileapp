@@ -74,9 +74,10 @@ export default function TaskDetailScreen({ route, navigation }) {
             productos: doc.data().productos || {}
           }))
           .sort((a, b) => {
+            // Invertir el orden: nivel_0 será la charola superior
             const numA = parseInt(a.id.split('_')[1]);
             const numB = parseInt(b.id.split('_')[1]);
-            return numB - numA; // Ordenar de mayor a menor
+            return numA - numB; // Ordenar de menor a mayor para que nivel_0 esté arriba
           });
 
         setPlanograma({
@@ -93,52 +94,58 @@ export default function TaskDetailScreen({ route, navigation }) {
     }
   };
 
-  const renderProductoDetalle = (producto) => (
-    <View style={styles.productoDetalleContainer}>
-      <View style={styles.productoDetalleHeader}>
-        <TouchableOpacity 
-          style={styles.closeButton}
-          onPress={() => setProductoSeleccionado(null)}
-        >
-          <Icon name="close" size={24} color={colors.text} />
-        </TouchableOpacity>
-      </View>
-      <View style={styles.productoDetalleContentHorizontal}>
-        <View style={styles.productoDetalleImageContainer}>
-          {producto.imagenUrl ? (
-            <Image 
-              source={{ uri: producto.imagenUrl }} 
-              style={styles.productoDetalleImagen}
-              resizeMode="contain"
-            />
-          ) : (
-            <View style={styles.productoDetallePlaceholder}>
-              <Icon name="image" size={48} color={colors.textLight} />
+  const renderProductoDetalle = (producto) => {
+    const nivelNum = parseInt(selectedNivel?.id.split('_')[1] || 0);
+    const totalNiveles = planograma?.niveles?.length || 0;
+    const charolaNum = totalNiveles - nivelNum;
+
+    return (
+      <View style={styles.productoDetalleContainer}>
+        <View style={styles.productoDetalleHeader}>
+          <TouchableOpacity 
+            style={styles.closeButton}
+            onPress={() => setProductoSeleccionado(null)}
+          >
+            <Icon name="close" size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.productoDetalleContentHorizontal}>
+          <View style={styles.productoDetalleImageContainer}>
+            {producto.imagenUrl ? (
+              <Image 
+                source={{ uri: producto.imagenUrl }} 
+                style={styles.productoDetalleImagen}
+                resizeMode="contain"
+              />
+            ) : (
+              <View style={styles.productoDetallePlaceholder}>
+                <Icon name="image" size={48} color={colors.textLight} />
+              </View>
+            )}
+          </View>
+          <View style={styles.productoDetalleInfo}>
+            <Text style={styles.productoDetalleTitulo}>{producto.nombre}</Text>
+            <View style={styles.productoDetalleData}>
+              <Text style={styles.productoDetalleLabel}>Planograma: </Text>
+              <Text style={styles.productoDetalleTexto}>{planograma.nombre}</Text>
             </View>
-          )}
-        </View>
-        <View style={styles.productoDetalleInfo}>
-          <Text style={styles.productoDetalleTitulo}>{producto.nombre}</Text>
-          <View style={styles.productoDetalleData}>
-            <Text style={styles.productoDetalleLabel}>Planograma: </Text>
-            <Text style={styles.productoDetalleTexto}>{planograma.nombre}</Text>
-          </View>
-          <View style={styles.productoDetalleData}>
-            <Text style={styles.productoDetalleLabel}>Charola: </Text>
-            <Text style={styles.productoDetalleTexto}>#{selectedNivel ? parseInt(selectedNivel.id.split('_')[1]) + 1 : ''}</Text>
-          </View>
-          <View style={styles.productoDetalleData}>
-            <Text style={styles.productoDetalleLabel}>Ubicación:</Text>
-            <Text style={styles.productoDetalleTexto}>{producto.gridPosition || 'No especificada'}</Text>
-          </View>
-          <View style={styles.productoDetalleData}>
-            <Text style={styles.productoDetalleLabel}>ID:</Text>
-            <Text style={styles.productoDetalleTexto}>{producto.id}</Text>
+            <View style={styles.productoDetalleData}>
+              <Text style={styles.productoDetalleLabel}>Charola: </Text>
+              <Text style={styles.productoDetalleTexto}>{charolaNum}</Text>
+            </View>
+            <View style={styles.productoDetalleData}>
+              <Text style={styles.productoDetalleLabel}>Ubicación:</Text>
+              <Text style={styles.productoDetalleTexto}>{producto.gridPosition || 'No especificada'}</Text>
+            </View>
+            <View style={styles.productoDetalleData}>
+              <Text style={styles.productoDetalleLabel}>ID:</Text>
+              <Text style={styles.productoDetalleTexto}>{producto.id}</Text>
+            </View>
           </View>
         </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderPlanogramaVisual = () => {
     if (!planograma) return null;
@@ -163,11 +170,13 @@ export default function TaskDetailScreen({ route, navigation }) {
         
         <ScrollView style={styles.planogramaScroll}>
           {planograma.niveles.map((nivel) => {
-            const nivelNum = parseInt(nivel.id.split('_')[1]) + 1;
+            const nivelNum = parseInt(nivel.id.split('_')[1]);
+            const totalNiveles = planograma.niveles.length;
+            const charolaNum = totalNiveles - nivelNum; // Invertir la numeración
             return (
               <View key={nivel.id} style={styles.nivelRow}>
                 <View style={styles.nivelHeader}>
-                  <Text style={styles.nivelLabel}>Charola {nivelNum}</Text>
+                  <Text style={styles.nivelLabel}>Charola {charolaNum}</Text>
                 </View>
                 <ScrollView horizontal style={styles.productosRow}>
                   {Object.entries(nivel.productos || {}).map(([index, producto]) => {
