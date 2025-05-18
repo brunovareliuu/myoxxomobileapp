@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "myoxxovision",
+    "name": "MyOxxoVision",
     "slug": "myoxxovision",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -12,18 +12,51 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.myoxxovision.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Esta aplicación necesita acceso a la cámara para tomar fotos de evidencias",
+        "NSPhotoLibraryUsageDescription": "Esta aplicación necesita acceso a la galería para seleccionar fotos de evidencias",
+        "NSPhotoLibraryAddUsageDescription": "Esta aplicación necesita permiso para guardar fotos en tu galería",
+        "NSMicrophoneUsageDescription": "Esta aplicación necesita acceso al micrófono para grabar videos"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "package": "com.myoxxovision.app",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
     },
     "web": {
       "favicon": "./assets/logo.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "La aplicación necesita acceso a tus fotos para seleccionar evidencias.",
+          "cameraPermission": "La aplicación necesita acceso a la cámara para tomar fotos de evidencias.",
+          "microphonePermission": "La aplicación necesita acceso al micrófono para grabar videos."
+        }
+      ],
+      [
+        "expo-file-system",
+        {
+          "filePermission": "La aplicación necesita acceso a los archivos para gestionar las evidencias."
+        }
+      ]
+    ]
   }
 }

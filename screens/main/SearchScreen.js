@@ -234,13 +234,15 @@ export default function SearchScreen() {
 
           for (const [index, producto] of Object.entries(productos)) {
             if (producto.nombre.toLowerCase().includes(searchQuery.toLowerCase())) {
+              const nivelNum = parseInt(nivelDoc.id.split('_')[1]) + 1;
+              const posicion = parseInt(index) + 1;
               foundProducts.push({
                 nombre: producto.nombre,
                 planograma: planogramaData.nombre,
-                nivel: nivelDoc.id.split('_')[1],
+                nivel: nivelNum,
                 id: producto.id,
                 imagen: producto.imagenUrl || null,
-                gridPosition: producto.gridPosition || 'No especificada',
+                gridPosition: posicion.toString(),
                 uniqueKey: `${producto.id}-${planogramaData.nombre}-${nivelDoc.id}-${index}`
               });
             }
@@ -389,8 +391,7 @@ export default function SearchScreen() {
       <View style={styles.planogramaVisualContainer}>
         <Text style={styles.visualTitle}>Planograma: {selectedPlanograma.nombre}</Text>
         <ScrollView horizontal={false} style={styles.planogramaScroll}>
-          {selectedPlanograma.niveles.map((nivel, index) => {
-            // Extraer el número del ID y asegurarnos que empiece en 1
+          {selectedPlanograma.niveles.map((nivel) => {
             const nivelNum = parseInt(nivel.id.split('_')[1]) + 1;
             return (
               <View key={nivel.id} style={styles.nivelRow}>
@@ -398,31 +399,34 @@ export default function SearchScreen() {
                   <Text style={styles.nivelLabel}>Charola {nivelNum}</Text>
                 </View>
                 <ScrollView horizontal style={styles.productosRow}>
-                  {Object.entries(nivel.productos || {}).map(([index, producto]) => (
-                    <TouchableOpacity 
-                      key={`${producto.id}-${index}`}
-                      style={styles.productoVisual}
-                      onPress={() => {
-                        setSelectedNivel(nivel);
-                        setProductoSeleccionado(producto);
-                      }}
-                    >
-                      {producto.imagenUrl ? (
-                        <Image 
-                          source={{ uri: producto.imagenUrl }} 
-                          style={styles.productoImagen}
-                          resizeMode="contain"
-                        />
-                      ) : (
-                        <View style={styles.productoPlaceholder}>
-                          <Icon name="image" size={24} color={colors.textLight} />
-                        </View>
-                      )}
-                      <Text style={styles.productoNombre} numberOfLines={2}>
-                        {producto.nombre}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  {Object.entries(nivel.productos || {}).map(([index, producto]) => {
+                    const posicion = parseInt(index) + 1;
+                    return (
+                      <TouchableOpacity 
+                        key={`${producto.id}-${index}`}
+                        style={styles.productoVisual}
+                        onPress={() => {
+                          setSelectedNivel(nivel);
+                          setProductoSeleccionado({...producto, gridPosition: posicion.toString()});
+                        }}
+                      >
+                        {producto.imagenUrl ? (
+                          <Image 
+                            source={{ uri: producto.imagenUrl }} 
+                            style={styles.productoImagen}
+                            resizeMode="contain"
+                          />
+                        ) : (
+                          <View style={styles.productoPlaceholder}>
+                            <Icon name="image" size={24} color={colors.textLight} />
+                          </View>
+                        )}
+                        <Text style={styles.productoNombre} numberOfLines={2}>
+                          {producto.nombre}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </ScrollView>
               </View>
             );

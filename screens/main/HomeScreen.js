@@ -9,7 +9,8 @@ import {
   Image,
   ActivityIndicator,
   StatusBar,
-  FlatList 
+  FlatList,
+  RefreshControl 
 } from 'react-native';
 import { doc, getDoc, query, collection, where, getDocs, orderBy, addDoc } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
@@ -21,62 +22,72 @@ export default function HomeScreen({ navigation }) {
   const [tiendaData, setTiendaData] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchData = async () => {
+    try {
+      const userId = auth.currentUser?.uid;
+      if (!userId) {
+        console.error('No hay usuario autenticado');
+        navigation.replace('Login');
+        return;
+      }
+
+      // Obtener datos del usuario
+      const userDocRef = doc(db, 'users', userId);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        setUserData(userData);
+
+        // Buscar la tienda usando el código de tienda del usuario
+        const tiendasRef = collection(db, 'tiendas');
+        const q = query(tiendasRef, where('codigoTienda', '==', userData.codigoTienda));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+          const tiendaDoc = querySnapshot.docs[0];
+          setTiendaData(tiendaDoc.data());
+
+          // Obtener tareas no completadas
+          const tareasRef = collection(db, 'tiendas', tiendaDoc.id, 'tareas');
+          const tareasQuery = query(
+            tareasRef,
+            where('completada', '==', false)
+          );
+          const tareasSnapshot = await getDocs(tareasQuery);
+          
+          const tareasData = tareasSnapshot.docs
+            .map(doc => ({
+              id: doc.id,
+              tiendaId: tiendaDoc.id,
+              ...doc.data()
+            }))
+            .sort((a, b) => new Date(a.fechaLimite) - new Date(b.fechaLimite));
+          
+          setTasks(tareasData);
+        }
+      } else {
+        console.error('No se encontraron datos del usuario');
+        navigation.replace('Login');
+      }
+    } catch (error) {
+      console.error('Error al cargar datos:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const userId = auth.currentUser?.uid;
-        if (!userId) {
-          console.error('No hay usuario autenticado');
-          navigation.replace('Login');
-          return;
-        }
-
-        // Obtener datos del usuario
-        const userDocRef = doc(db, 'users', userId);
-        const userDocSnap = await getDoc(userDocRef);
-
-        if (userDocSnap.exists()) {
-          const userData = userDocSnap.data();
-          setUserData(userData);
-
-          // Buscar la tienda usando el código de tienda del usuario
-          const tiendasRef = collection(db, 'tiendas');
-          const q = query(tiendasRef, where('codigoTienda', '==', userData.codigoTienda));
-          const querySnapshot = await getDocs(q);
-
-          if (!querySnapshot.empty) {
-            const tiendaDoc = querySnapshot.docs[0];
-            setTiendaData(tiendaDoc.data());
-
-            // Obtener todas las tareas y filtrar en el cliente
-            const tareasRef = collection(db, 'tiendas', tiendaDoc.id, 'tareas');
-            const tareasSnapshot = await getDocs(tareasRef);
-            
-            const tareasData = tareasSnapshot.docs
-              .map(doc => ({
-                id: doc.id,
-                tiendaId: tiendaDoc.id,
-                ...doc.data()
-              }))
-              .filter(tarea => tarea.activa) // Filtrar tareas activas en el cliente
-              .sort((a, b) => new Date(a.fechaLimite) - new Date(b.fechaLimite)); // Ordenar por fecha
-            
-            setTasks(tareasData);
-          }
-        } else {
-          console.error('No se encontraron datos del usuario');
-          navigation.replace('Login');
-        }
-      } catch (error) {
-        console.error('Error al cargar datos:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
   }, [navigation]);
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    fetchData();
+  }, []);
 
   const renderTaskItem = ({ item }) => (
     <TouchableOpacity 
@@ -167,6 +178,15 @@ export default function HomeScreen({ navigation }) {
           keyExtractor={item => item.id}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.tasksList}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Icon name="assignment" size={64} color={colors.textLight} />
+              <Text style={styles.emptyText}>No hay tareas pendientes</Text>
+            </View>
+          }
         />
       </View>
     </SafeAreaView>
@@ -284,5 +304,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textLight,
     marginLeft: 8,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 18,
+    color: colors.textLight,
+    marginTop: 20,
   },
 });

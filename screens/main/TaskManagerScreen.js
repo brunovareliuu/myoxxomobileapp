@@ -50,7 +50,7 @@ export default function TaskManagerScreen({ navigation }) {
           // Consulta según la pestaña activa
           const tareasQuery = query(
             tareasRef,
-            where('activa', '==', activeTab === 'activas')
+            where('completada', '==', activeTab === 'completadas')
           );
           
           const tareasSnapshot = await getDocs(tareasQuery);
@@ -73,7 +73,7 @@ export default function TaskManagerScreen({ navigation }) {
   const renderTaskItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.taskCard}
-      onPress={() => navigation.navigate('TaskDetail', { 
+      onPress={() => navigation.navigate(activeTab === 'completadas' ? 'ResultsInformation' : 'TaskDetail', { 
         taskId: item.id,
         tiendaId: item.tiendaId 
       })}
@@ -94,7 +94,8 @@ export default function TaskManagerScreen({ navigation }) {
         <View style={styles.taskInfoRow}>
           <Icon name="event" size={16} color={colors.textLight} />
           <Text style={styles.taskInfoText}>
-            Límite: {new Date(item.fechaLimite).toLocaleDateString()}
+            {activeTab === 'completadas' ? 'Completada: ' + new Date(item.fechaCompletado).toLocaleDateString() : 
+             'Límite: ' + new Date(item.fechaLimite).toLocaleDateString()}
           </Text>
         </View>
         <View style={styles.taskInfoRow}>

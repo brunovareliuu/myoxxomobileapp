@@ -10,16 +10,17 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
-  Platform
+  Platform,
+  RefreshControl
 } from 'react-native';
 import { doc, getDoc, collection, getDocs, updateDoc, query, orderBy, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../../config/firebase';
+import { db, storage, auth } from '../../config/firebase';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { colors } from '../../styles/globalStyles';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { Camera } from 'expo-camera';
-import * as DocumentPicker from 'expo-document-picker';
 
 export default function TaskDetailScreen({ route, navigation }) {
   const { taskId, tiendaId } = route.params;
@@ -30,6 +31,7 @@ export default function TaskDetailScreen({ route, navigation }) {
   const [showImageOptions, setShowImageOptions] = useState(false);
   const [hasPermission, setHasPermission] = useState(null);
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadTaskAndPlanograma();
@@ -37,6 +39,11 @@ export default function TaskDetailScreen({ route, navigation }) {
       const { status } = await Camera.requestCameraPermissionsAsync();
       setHasPermission(status === 'granted');
     })();
+  }, []);
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    loadTaskAndPlanograma().finally(() => setRefreshing(false));
   }, []);
 
   const loadTaskAndPlanograma = async () => {
@@ -163,31 +170,34 @@ export default function TaskDetailScreen({ route, navigation }) {
                   <Text style={styles.nivelLabel}>Charola {nivelNum}</Text>
                 </View>
                 <ScrollView horizontal style={styles.productosRow}>
-                  {Object.entries(nivel.productos || {}).map(([index, producto]) => (
-                    <TouchableOpacity 
-                      key={`${producto.id}-${index}`}
-                      style={styles.productoVisual}
-                      onPress={() => {
-                        setSelectedNivel(nivel);
-                        setProductoSeleccionado(producto);
-                      }}
-                    >
-                      {producto.imagenUrl ? (
-                        <Image 
-                          source={{ uri: producto.imagenUrl }} 
-                          style={styles.productoImagen}
-                          resizeMode="contain"
-                        />
-                      ) : (
-                        <View style={styles.productoPlaceholder}>
-                          <Icon name="image" size={24} color={colors.textLight} />
-                        </View>
-                      )}
-                      <Text style={styles.productoNombre} numberOfLines={2}>
-                        {producto.nombre}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  {Object.entries(nivel.productos || {}).map(([index, producto]) => {
+                    const posicion = parseInt(index) + 1;
+                    return (
+                      <TouchableOpacity 
+                        key={`${producto.id}-${index}`}
+                        style={styles.productoVisual}
+                        onPress={() => {
+                          setSelectedNivel(nivel);
+                          setProductoSeleccionado({...producto, gridPosition: posicion.toString()});
+                        }}
+                      >
+                        {producto.imagenUrl ? (
+                          <Image 
+                            source={{ uri: producto.imagenUrl }} 
+                            style={styles.productoImagen}
+                            resizeMode="contain"
+                          />
+                        ) : (
+                          <View style={styles.productoPlaceholder}>
+                            <Icon name="image" size={24} color={colors.textLight} />
+                          </View>
+                        )}
+                        <Text style={styles.productoNombre} numberOfLines={2}>
+                          {producto.nombre}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </ScrollView>
               </View>
             );
@@ -205,60 +215,157 @@ export default function TaskDetailScreen({ route, navigation }) {
 
   const handleImageUpload = async (imageUri, type = 'photo') => {
     try {
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
+      setLoading(true);
       
-      const fileName = `tasks/${task.id}/${Date.now()}.jpg`;
-      const storageRef = ref(storage, fileName);
-      
-      await uploadBytes(storageRef, blob);
-      const downloadURL = await getDownloadURL(storageRef);
+      // Verificar autenticación
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error('Usuario no autenticado');
+      }
+      console.log('Usuario autenticado:', currentUser.uid);
 
-      // Crear nueva entrada en la colección de evidencias
-      const evidenciasRef = collection(db, 'tiendas', tiendaId, 'tareas', taskId, 'evidencias');
-      const currentDate = new Date();
-      const fechaLimite = new Date(task.fechaLimite);
-      
-      await addDoc(evidenciasRef, {
-        nombreEnviante: userData?.nombre || 'Usuario',
-        hora: currentDate.toISOString(),
-        aTiempo: currentDate <= fechaLimite,
-        imagenUrl: downloadURL,
-        tipo: type,
-        fechaCreacion: currentDate.toISOString(),
-        estado: 'pendiente_revision',
-        comentarios: [],
-        metadata: {
-          dispositivo: Platform.OS,
-          tipoArchivo: type,
-          tamanioArchivo: blob.size,
-          resolucion: type === 'photo' ? 'original' : 'N/A'
-        }
+      // Verificar que tenemos los IDs necesarios
+      if (!tiendaId || !taskId) {
+        console.error('IDs faltantes:', { tiendaId, taskId });
+        throw new Error('IDs de tienda o tarea no disponibles');
+      }
+      console.log('IDs verificados:', { tiendaId, taskId });
+
+      // Obtener información del archivo
+      const fileInfo = await FileSystem.getInfoAsync(imageUri);
+      console.log('Información del archivo:', fileInfo);
+
+      if (!fileInfo.exists) {
+        throw new Error('No se puede acceder al archivo de imagen');
+      }
+
+      // Verificar tamaño
+      if (fileInfo.size > 5 * 1024 * 1024) {
+        throw new Error('La imagen es demasiado grande. El tamaño máximo es 5MB.');
+      }
+
+      // Leer el archivo como base64
+      const base64Data = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
       });
+      
+      // Crear una referencia única para la imagen
+      const timestamp = Date.now();
+      const fileName = `evidencias/${tiendaId}/${taskId}/${timestamp}.jpg`;
+      console.log('Nombre del archivo:', fileName);
+      
+      try {
+        // Crear referencia al storage
+        const storageRef = ref(storage, fileName);
+        console.log('Referencia de storage creada');
 
-      Alert.alert('Éxito', 'Evidencia subida correctamente');
+        // Convertir base64 a blob
+        const response = await fetch(`data:image/jpeg;base64,${base64Data}`);
+        const blob = await response.blob();
+
+        // Configurar metadata
+        const metadata = {
+          contentType: 'image/jpeg',
+          customMetadata: {
+            userId: currentUser.uid,
+            tiendaId: tiendaId,
+            taskId: taskId,
+            uploadTimestamp: timestamp.toString(),
+            deviceType: Platform.OS
+          }
+        };
+
+        // Subir a Firebase Storage
+        console.log('Iniciando subida con metadata:', metadata);
+        const uploadTask = await uploadBytes(storageRef, blob, metadata);
+        console.log('Subida completada:', uploadTask);
+
+        // Obtener URL de descarga
+        console.log('Obteniendo URL...');
+        const downloadURL = await getDownloadURL(uploadTask.ref);
+        console.log('URL obtenida:', downloadURL);
+
+        // Crear nueva entrada en la colección de evidencias
+        const evidenciasRef = collection(db, 'tiendas', tiendaId, 'tareas', taskId, 'evidencias');
+        const currentDate = new Date();
+        
+        const evidenciaData = {
+          imagenUrl: downloadURL,
+          tipo: type,
+          fechaCreacion: currentDate.toISOString(),
+          estado: 'pendiente_revision',
+          userId: currentUser.uid,
+          metadata: {
+            nombreArchivo: fileName,
+            tipoArchivo: 'image/jpeg',
+            tamanioArchivo: fileInfo.size,
+            timestamp: timestamp,
+            dispositivo: Platform.OS,
+            resolucion: type === 'photo' ? 'original' : 'N/A'
+          }
+        };
+
+        console.log('Guardando en Firestore:', evidenciaData);
+        await addDoc(evidenciasRef, evidenciaData);
+
+        // Actualizar el estado de la tarea
+        const tareaRef = doc(db, 'tiendas', tiendaId, 'tareas', taskId);
+        await updateDoc(tareaRef, {
+          ultimaActualizacion: currentDate.toISOString(),
+          tieneEvidencias: true,
+          completada: true,
+          fechaCompletado: currentDate.toISOString()
+        });
+
+        console.log('Proceso completado exitosamente');
+        Alert.alert('Éxito', 'La evidencia se ha subido correctamente y la tarea ha sido marcada como completada');
+        navigation.goBack();
+      } catch (storageError) {
+        console.error('Error detallado de Storage:', {
+          code: storageError.code,
+          message: storageError.message,
+          serverResponse: storageError.serverResponse,
+          name: storageError.name,
+          stack: storageError.stack
+        });
+        throw storageError;
+      }
     } catch (error) {
-      console.error('Error al subir la evidencia:', error);
-      Alert.alert('Error', 'No se pudo subir la evidencia');
+      console.error('Error completo:', error);
+      let errorMessage = 'No se pudo subir la evidencia.';
+      
+      if (error.message.includes('demasiado grande')) {
+        errorMessage = error.message;
+      } else if (error.code === 'storage/unauthorized') {
+        errorMessage = 'No tienes permisos para subir archivos.';
+      } else if (error.code === 'storage/canceled') {
+        errorMessage = 'La subida fue cancelada.';
+      } else if (error.code === 'storage/unknown') {
+        errorMessage = 'Error de conexión. Por favor, verifica tu conexión a internet e intenta nuevamente.';
+      }
+      
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
   const takePhoto = async () => {
     try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      const { status } = await Camera.requestCameraPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Error', 'Se necesita permiso para acceder a la cámara');
         return;
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 1,
       });
 
-      if (!result.canceled && result.assets[0].uri) {
+      if (!result.canceled && result.assets && result.assets[0]) {
+        setShowImageOptions(false);
         await handleImageUpload(result.assets[0].uri, 'photo');
       }
     } catch (error) {
@@ -269,34 +376,25 @@ export default function TaskDetailScreen({ route, navigation }) {
 
   const pickImage = async () => {
     try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Error', 'Se necesita permiso para acceder a la galería');
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 1,
       });
 
-      if (!result.canceled && result.assets[0].uri) {
+      if (!result.canceled && result.assets && result.assets[0]) {
+        setShowImageOptions(false);
         await handleImageUpload(result.assets[0].uri, 'gallery');
       }
     } catch (error) {
       console.error('Error al seleccionar imagen:', error);
       Alert.alert('Error', 'No se pudo seleccionar la imagen');
-    }
-  };
-
-  const pickDocument = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['image/*', 'application/pdf'],
-      });
-
-      if (result.type === 'success') {
-        await handleImageUpload(result.uri, 'document');
-      }
-    } catch (error) {
-      console.error('Error al seleccionar documento:', error);
-      Alert.alert('Error', 'No se pudo seleccionar el documento');
     }
   };
 
@@ -322,7 +420,12 @@ export default function TaskDetailScreen({ route, navigation }) {
         <Text style={styles.headerTitle}>Detalles de la Tarea</Text>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView 
+        style={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         <View style={styles.taskHeader}>
           <Text style={styles.taskTitle}>{task?.titulo}</Text>
           <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(task?.prioridad) }]}>
@@ -385,10 +488,7 @@ export default function TaskDetailScreen({ route, navigation }) {
             
             <TouchableOpacity 
               style={styles.modalOption}
-              onPress={() => {
-                setShowImageOptions(false);
-                takePhoto();
-              }}
+              onPress={takePhoto}
             >
               <Icon name="camera-alt" size={24} color={colors.primary} />
               <Text style={styles.modalOptionText}>Tomar Foto</Text>
@@ -396,24 +496,10 @@ export default function TaskDetailScreen({ route, navigation }) {
 
             <TouchableOpacity 
               style={styles.modalOption}
-              onPress={() => {
-                setShowImageOptions(false);
-                pickImage();
-              }}
+              onPress={pickImage}
             >
               <Icon name="photo-library" size={24} color={colors.primary} />
               <Text style={styles.modalOptionText}>Seleccionar de Galería</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.modalOption}
-              onPress={() => {
-                setShowImageOptions(false);
-                pickDocument();
-              }}
-            >
-              <Icon name="attach-file" size={24} color={colors.primary} />
-              <Text style={styles.modalOptionText}>Adjuntar Documento</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
